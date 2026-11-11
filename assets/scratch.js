@@ -4,6 +4,7 @@
      values  optional list drawn as array boxes, so you only draw the pointers
      fill    true = take the height of the parent instead of a fixed height
    Stylus draws. One finger drags the canvas, two fingers pinch to zoom.
+   Lasso tool: circle some strokes, then drag them, recolour them or bin them.
    Mouse: left draws, right or middle drag moves, wheel moves, Ctrl+wheel zooms.
    openScratchSheet({ key, title, values }) docks a pad beside the page (right side in landscape). */
 (function () {
@@ -21,6 +22,7 @@
   const I = {
     pen: S('<path d="M4 20l4-1L19 8l-3-3L5 16l-1 4z"/><path d="M14 7l3 3"/>'),
     erase: S('<path d="M9 20h11"/><path d="M5 15l9-9 5 5-9 9H7l-2-2a2 2 0 0 1 0-3z"/>'),
+    lasso: S('<ellipse cx="12" cy="10" rx="9" ry="6" stroke-dasharray="3 3.2"/><path d="M8 15.5c-1.5 2-.5 4 2 5"/>'),
     undo: S('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
     full: S('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
     small: S('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>'),
@@ -41,11 +43,14 @@
     let cur = null, erasing = false, W = 0, H = 0, dpr = 1, frame = 0, saveT = 0;
     const touches = new Map();          // pointers that move the view (fingers, right/middle mouse)
     let gesture = null;
+    let sel = null, lasso = null, moving = null;   // lasso tool: selected strokes, the loop being drawn, a drag of the selection
+    const act = () => (cur ? cur.id : lasso ? lasso.id : moving ? moving.id : null);   // pointer that is drawing right now
 
     host.innerHTML = `<div class="sp${opt.fill ? " fill" : ""}">
       <div class="sp-bar" role="toolbar" aria-label="Scratchpad tools">
         <button class="sp-t" data-a="pen" aria-pressed="true" aria-label="Pen">${I.pen}</button>
         <button class="sp-t" data-a="erase" aria-pressed="false" aria-label="Eraser">${I.erase}</button>
+        <button class="sp-t" data-a="lasso" aria-pressed="false" aria-label="Lasso select">${I.lasso}</button>
         <span class="sp-sep"></span>
         <button class="sp-t" data-c="ink" aria-pressed="true" aria-label="Black ink"><i class="sp-dot"></i></button>
         <button class="sp-t" data-c="red" aria-pressed="false" aria-label="Red ink"><i class="sp-dot"></i></button>
@@ -150,6 +155,20 @@
       drawTpl();
       st.s.forEach((s) => stroke(s, true));
       if (cur) stroke(cur, false);
+      const z = st.v.z;
+      if (sel) {
+        const b = selBox(), m = 8 / z;
+        ctx.strokeStyle = pal.blue; ctx.lineWidth = 1.6 / z; ctx.setLineDash([7 / z, 5 / z]);
+        ctx.strokeRect(b.x0 - m, b.y0 - m, b.x1 - b.x0 + 2 * m, b.y1 - b.y0 + 2 * m);
+        ctx.globalAlpha = 0.07; ctx.fillStyle = pal.blue; ctx.fillRect(b.x0 - m, b.y0 - m, b.x1 - b.x0 + 2 * m, b.y1 - b.y0 + 2 * m); ctx.globalAlpha = 1;
+        ctx.setLineDash([]);
+      }
+      if (lasso && lasso.p.length > 2) {
+        ctx.strokeStyle = pal.blue; ctx.lineWidth = 1.8 / z; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.setLineDash([6 / z, 6 / z]);
+        ctx.beginPath(); ctx.moveTo(lasso.p[0], lasso.p[1]);
+        for (let i = 2; i < lasso.p.length; i += 2) ctx.lineTo(lasso.p[i], lasso.p[i + 1]);
+        ctx.stroke(); ctx.setLineDash([]);
+      }
       paintGrid();
       el.querySelector(".sp-hint").hidden = st.s.length > 0 || !!cur || st.tpl !== "none";
     }
@@ -167,6 +186,43 @@
       const keep = st.s.filter((s) => { for (let i = 0; i < s.p.length; i += 3) if (Math.hypot(s.p[i] - x, s.p[i + 1] - y) < rad) return false; return true; });
       if (keep.length !== st.s.length) { st.s = keep; redraw(); }
     }
+    /* ---- lasso: circle strokes to select them, then drag, recolour or delete ---- */
+    function selBox() {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      sel.forEach((s) => { for (let i = 0; i < s.p.length; i += 3) { x0 = Math.min(x0, s.p[i]); y0 = Math.min(y0, s.p[i + 1]); x1 = Math.max(x1, s.p[i]); y1 = Math.max(y1, s.p[i + 1]); } });
+      return { x0, y0, x1, y1 };
+    }
+    function inside(x, y, q) {             // is the point inside the closed loop q = [x, y, x, y, ...]
+      let hit = false;
+      for (let i = 0, j = q.length - 2; i < q.length; j = i, i += 2)
+        if ((q[i + 1] > y) !== (q[j + 1] > y) && x < (q[j] - q[i]) * (y - q[i + 1]) / (q[j + 1] - q[i + 1]) + q[i]) hit = !hit;
+      return hit;
+    }
+    function pickLasso(q) {                // a stroke is picked when at least half of it is inside the loop
+      const got = st.s.filter((s) => { let n = 0; const t = s.p.length / 3; for (let i = 0; i < s.p.length; i += 3) if (inside(s.p[i], s.p[i + 1], q)) n++; return n * 2 >= t; });
+      sel = got.length ? new Set(got) : null;
+      status.textContent = sel ? `${got.length} stroke${got.length > 1 ? "s" : ""} selected. Drag to move, pick a colour, or tap the bin.` : "Nothing inside the loop. Circle what you want to select.";
+    }
+    function fresh() {                     // swap the selected strokes for copies, so undo keeps the originals
+      const next = new Set();
+      st.s = st.s.map((s) => { if (!sel.has(s)) return s; const c = { c: s.c, p: s.p.slice() }; next.add(c); return c; });
+      sel = next;
+    }
+    function dropSel() { if (sel) { sel = null; redraw(); } }
+    function deleteSel() {
+      if (!sel) return;
+      snap(); const n = sel.size; st.s = st.s.filter((s) => !sel.has(s)); sel = null;
+      redraw(); save(); status.textContent = `Deleted ${n} stroke${n > 1 ? "s" : ""}. Undo brings them back.`;
+    }
+    function beginLasso(e) {
+      const [x, y] = at(e);
+      if (sel) {
+        const b = selBox(), m = 14 / st.v.z;
+        if (x >= b.x0 - m && x <= b.x1 + m && y >= b.y0 - m && y <= b.y1 + m) { snap(); fresh(); moving = { id: e.pointerId, x, y, moved: false }; return; }
+      }
+      sel = null; lasso = { id: e.pointerId, p: [x, y] }; redraw();
+    }
+
     function fit() {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
@@ -202,9 +258,10 @@
     function beginStroke(e) {
       e.preventDefault();
       try { cv.setPointerCapture(e.pointerId); } catch (err) {}
-      snap();
       // the eraser end or the side button of a stylus erases without switching tools
-      if (tool === "erase" || e.button === 5 || (e.buttons & 32) || (e.pointerType === "pen" && (e.buttons & 2))) { erasing = e.pointerId; eraseAt(e); return; }
+      if (tool === "erase" || e.button === 5 || (e.buttons & 32) || (e.pointerType === "pen" && (e.buttons & 2))) { sel = null; snap(); erasing = e.pointerId; eraseAt(e); redraw(); return; }
+      if (tool === "lasso") { beginLasso(e); return; }
+      snap();
       if (e.pointerType === "pen") status.textContent = "Stylus detected. Press harder for thicker lines.";
       cur = { c: color, p: at(e), id: e.pointerId };
       el.querySelector(".sp-hint").hidden = true;
@@ -214,13 +271,15 @@
     cv.addEventListener("pointerdown", (e) => {
       if (e.pointerType === "pen") lastPen = Date.now();
       if (e.pointerType === "touch") {
-        if (erasing || (cur && !touches.has(cur.id))) return;        // the stylus is writing: this is the palm
+        if (erasing || (act() != null && !touches.has(act()))) return;   // the stylus is writing: this is the palm
         if (Date.now() - lastPen < 900 || e.width * e.height > 1600) return;  // pen just lifted, or a palm-sized contact
         e.preventDefault();
         try { cv.setPointerCapture(e.pointerId); } catch (err) {}
         touches.set(e.pointerId, sp(e));
         if (finger && touches.size === 1) { beginStroke(e); return; }
         if (cur) { cur = null; undo.pop(); redraw(); }               // a second finger turns a finger stroke into a pinch
+        if (lasso) { lasso = null; redraw(); }
+        if (moving) { moving = null; sel = null; st.s = undo.pop(); redraw(); }
         startGesture(); return;
       }
       if (e.pointerType === "mouse" && (e.button === 1 || e.button === 2)) {
@@ -228,7 +287,7 @@
         try { cv.setPointerCapture(e.pointerId); } catch (err) {}
         touches.set(e.pointerId, sp(e)); startGesture(); return;
       }
-      if (cur || erasing) return;
+      if (act() != null || erasing) return;
       if (e.pointerType === "pen" && gesture) { st.v = { ...gesture.v0 }; gesture = null; touches.clear(); }  // a palm landed first: undo its drag
       beginStroke(e);
     });
@@ -236,9 +295,21 @@
       if (e.pointerType === "pen") lastPen = Date.now();
       if (touches.has(e.pointerId)) {
         touches.set(e.pointerId, sp(e));
-        if (!(cur && cur.id === e.pointerId)) { moveGesture(); return; }
+        if (act() !== e.pointerId) { moveGesture(); return; }
       }
       if (erasing === e.pointerId) { eraseAt(e); return; }
+      if (lasso && lasso.id === e.pointerId) {
+        const [x, y] = at(e), n = lasso.p.length;
+        if (Math.abs(x - lasso.p[n - 2]) + Math.abs(y - lasso.p[n - 1]) > 2 / st.v.z) { lasso.p.push(x, y); later(); }
+        return;
+      }
+      if (moving && moving.id === e.pointerId) {
+        const [x, y] = at(e), dx = x - moving.x, dy = y - moving.y;
+        if (!dx && !dy) return;
+        sel.forEach((s) => { for (let i = 0; i < s.p.length; i += 3) { s.p[i] = Math.round((s.p[i] + dx) * 10) / 10; s.p[i + 1] = Math.round((s.p[i + 1] + dy) * 10) / 10; } });
+        moving.x = x; moving.y = y; moving.moved = true; later();
+        return;
+      }
       if (!cur || e.pointerId !== cur.id) return;
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
       ctx.strokeStyle = pal[cur.c]; ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -252,8 +323,10 @@
     function end(e) {
       if (touches.has(e.pointerId)) {
         touches.delete(e.pointerId);
-        if (!(cur && cur.id === e.pointerId)) { if (touches.size) startGesture(); else { gesture = null; saveSoon(); } return; }
+        if (act() !== e.pointerId) { if (touches.size) startGesture(); else { gesture = null; saveSoon(); } return; }
       }
+      if (lasso && lasso.id === e.pointerId) { const q = lasso.p; lasso = null; if (q.length >= 6) pickLasso(q); redraw(); return; }
+      if (moving && moving.id === e.pointerId) { const m = moving.moved; moving = null; if (m) save(); else undo.pop(); return; }
       if (erasing === e.pointerId) { erasing = false; if (undo.length && undo[undo.length - 1].length === st.s.length) undo.pop(); save(); return; }
       if (!cur || e.pointerId !== cur.id) return;
       st.s.push({ c: cur.c, p: cur.p }); cur = null;
@@ -277,7 +350,8 @@
     }, { passive: false });
 
     /* ---- toolbar ---- */
-    const press = (sel, on) => el.querySelectorAll(sel).forEach((b) => b.setAttribute("aria-pressed", String(b === on)));
+    const press = (q, on) => el.querySelectorAll(q).forEach((b) => b.setAttribute("aria-pressed", String(b === on)));
+    const TOOLS = '[data-a="pen"],[data-a="erase"],[data-a="lasso"]';
     const paintTpl = () => { $("tpl").setAttribute("aria-label", "Boxes to draw on: " + TPL_LABEL[st.tpl]); $("tpl").setAttribute("aria-pressed", String(st.tpl !== "none")); };
     const paintFinger = () => {
       $("finger").setAttribute("aria-pressed", String(finger));
@@ -289,18 +363,32 @@
     }
     el.addEventListener("click", (e) => {
       const b = e.target.closest(".sp-t"); if (!b) return;
-      if (b.dataset.c) { color = b.dataset.c; tool = "pen"; press("[data-c]", b); press('[data-a="pen"],[data-a="erase"]', $("pen")); return; }
+      if (b.dataset.c) {
+        color = b.dataset.c; press("[data-c]", b);
+        if (tool === "lasso" && sel) { snap(); fresh(); sel.forEach((s) => (s.c = color)); redraw(); save(); return; }   // recolour the selection
+        tool = "pen"; press(TOOLS, $("pen")); dropSel(); return;
+      }
       const a = b.dataset.a;
-      if (a === "pen" || a === "erase") { tool = a; press('[data-a="pen"],[data-a="erase"]', b); }
+      if (a === "pen" || a === "erase" || a === "lasso") {
+        tool = a; press(TOOLS, b); if (a !== "lasso") dropSel();
+        if (a === "lasso") status.textContent = "Circle what you want to select, then drag it to move it.";
+      }
       else if (a === "tpl") { st.tpl = TPL[(TPL.indexOf(st.tpl) + 1) % TPL.length]; paintTpl(); redraw(); save(); status.textContent = TPL_LABEL[st.tpl]; }
-      else if (a === "undo") { if (undo.length) { st.s = undo.pop(); redraw(); save(); } }
+      else if (a === "undo") { if (undo.length) { sel = null; st.s = undo.pop(); redraw(); save(); } }
+      else if (a === "clear" && sel) deleteSel();                 // with a selection, the bin deletes only that
       else if (a === "clear") { if (st.s.length) { snap(); st.s = []; st.v = { x: 0, y: 0, z: 1 }; st.tw = W; redraw(); save(); } }
       else if (a === "fit") fit();
       else if (a === "full") setFull(!el.classList.contains("full"));
       else if (a === "close") { setFull(false); opt.onClose(); }
       else if (a === "finger") { finger = !finger; if (window.Store) Store.set("padFinger", finger || undefined); paintFinger(); }
     });
-    const onKey = (e) => { if (e.key === "Escape" && el.classList.contains("full")) { e.preventDefault(); setFull(false); } };
+    const onKey = (e) => {
+      if (sel && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "") && !e.target.isContentEditable) {
+        if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSel(); return; }
+        if (e.key === "Escape") { e.preventDefault(); dropSel(); return; }
+      }
+      if (e.key === "Escape" && el.classList.contains("full")) { e.preventDefault(); setFull(false); }
+    };
     addEventListener("keydown", onKey);
 
     if (!opt.fill) area.style.height = st.h + "px";

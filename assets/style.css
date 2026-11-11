@@ -499,6 +499,6 @@ body.sheet-open .nav .search-btn span, body.sheet-open .nav .streak span { displ
 body.sheet-open .nav .search-btn { min-width: 44px; width: 44px; justify-content: center; padding: 0; }
 .sp-bar { gap: 4px; padding: 6px; }
 .sp-bar .sp-sep { display: none; }
-html.touch .sp-bar .sp-t { min-width: 40px; width: 40px; height: 44px; padding: 0; }
-html.touch .sp-bar .sp-t[data-c] { min-width: 36px; width: 36px; }
+html.touch .sp-bar .sp-t { min-width: 37px; width: 37px; height: 44px; padding: 0; }
+html.touch .sp-bar .sp-t[data-c] { min-width: 32px; width: 32px; }
 @media (min-width: 700px) { html.touch .sp:not(.fill) .sp-bar .sp-t, html.touch .sp.full .sp-bar .sp-t { min-width: 46px; width: 46px; } }
