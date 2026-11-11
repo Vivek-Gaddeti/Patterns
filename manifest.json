@@ -1,0 +1,16 @@
+{
+  "name": "Patterns — DSA pattern practice",
+  "short_name": "Patterns",
+  "description": "Learn, practise and revise DSA patterns for online assessments.",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#FFFDF5",
+  "theme_color": "#FFD23F",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
