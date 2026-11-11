@@ -1,8 +1,10 @@
-/* Scratchpad: a handwriting canvas for stylus, finger or mouse.
-   mountScratch(host, { key, height, values, fill }) -> { el, destroy }
+/* Scratchpad: an infinite handwriting canvas for stylus, finger or mouse.
+   mountScratch(host, { key, height, values, fill, onClose }) -> { el, destroy }
      key     where the sketch is saved (one sketch per card / problem / pattern)
      values  optional list drawn as array boxes, so you only draw the pointers
      fill    true = take the height of the parent instead of a fixed height
+   Stylus draws. One finger drags the canvas, two fingers pinch to zoom.
+   Mouse: left draws, right or middle drag moves, wheel moves, Ctrl+wheel zooms.
    openScratchSheet({ key, title, values }) docks a pad beside the page (right side in landscape). */
 (function () {
   const LS = "patterns.scratch.v1", KEEP = 80;
@@ -27,13 +29,18 @@
     trash: S('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>')
   };
   const TPL = ["none", "array", "grid"], TPL_LABEL = { none: "Boxes off", array: "Array boxes", grid: "Grid" };
+  const MINZ = 0.2, MAXZ = 5, clampZ = (z) => Math.min(MAXZ, Math.max(MINZ, z));
   let lastPen = 0;                      // time of the last stylus event anywhere: used to ignore the resting palm
 
   window.mountScratch = function (host, opt = {}) {
-    const key = opt.key || "scratch";
-    const st = Object.assign({ s: [], bw: 0, h: opt.height || 320, tpl: opt.values ? "array" : "none" }, db[key] || {});
+    const key = opt.key || "scratch", saved = db[key] || {};
+    // strokes are stored in canvas ("world") coordinates; v is the view: top-left world point and zoom
+    const st = { s: saved.s || [], h: saved.h || opt.height || 320, tpl: saved.tpl || (opt.values ? "array" : "none"), tw: saved.tw || saved.bw || 0, v: saved.v || null };
+    const oldWidth = !saved.v && saved.bw ? saved.bw : 0;   // sketches saved before the canvas could move
     let tool = "pen", color = "ink", finger = !!(window.Store && Store.get("padFinger")), undo = [];
-    let cur = null, erasing = false, scroll = null, W = 0, H = 0, dpr = 1;
+    let cur = null, erasing = false, W = 0, H = 0, dpr = 1, frame = 0, saveT = 0;
+    const touches = new Map();          // pointers that move the view (fingers, right/middle mouse)
+    let gesture = null;
 
     host.innerHTML = `<div class="sp${opt.fill ? " fill" : ""}">
       <div class="sp-bar" role="toolbar" aria-label="Scratchpad tools">
@@ -53,8 +60,8 @@
       </div>
       <div class="sp-area"><canvas aria-label="Drawing area"></canvas><div class="sp-hint">Write or draw here</div></div>
       <div class="sp-foot"><span class="sp-status"></span><span class="sp-grow"></span>
-        <button class="sp-t txt" data-a="finger" aria-pressed="false">Draw with finger</button>
-        <button class="sp-t txt" data-a="more">More space</button></div>
+        <button class="sp-t txt" data-a="fit" title="Show the whole drawing">Fit</button>
+        <button class="sp-t txt" data-a="finger" aria-pressed="false">Draw with finger</button></div>
     </div>`;
     const el = host.firstElementChild, area = el.querySelector(".sp-area"), cv = el.querySelector("canvas");
     const ctx = cv.getContext("2d");   // not "desynchronized": on Android that makes the canvas opaque black
@@ -69,30 +76,53 @@
       pal = { ink, red: dark ? "#FF8A8A" : "#E5484D", blue: dark ? "#8CC4FF" : "#2B7FD9", muted: cs.getPropertyValue("--muted").trim() || "#888" };
       el.querySelectorAll("[data-c]").forEach((b) => (b.firstElementChild.style.background = pal[b.dataset.c]));
     }
-    const scale = () => (st.bw ? W / st.bw : 1);
 
     function resize() {
       const w = area.clientWidth, h = area.clientHeight;
       if (!w || !h) return;
       dpr = window.devicePixelRatio || 1; W = w; H = h;
-      if (!st.bw || !st.s.length) st.bw = W;        // an empty pad adopts the current width
+      if (!st.tw) st.tw = W;
+      if (!st.v) st.v = { x: 0, y: 0, z: oldWidth && st.s.length ? clampZ(W / oldWidth) : 1 };
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
       redraw();
     }
+
+    /* ---- view ---- */
+    const setT = () => { const v = st.v, k = dpr * v.z; ctx.setTransform(k, 0, 0, k, -v.x * k, -v.y * k); };
+    function paintGrid() {                // the dot grid moves and scales with the canvas
+      const v = st.v; let g = 22 * v.z;
+      while (g < 11) g *= 2;
+      area.style.backgroundSize = `${g}px ${g}px`;
+      area.style.backgroundPosition = `${(-v.x * v.z) % g}px ${(-v.y * v.z) % g}px`;
+    }
+    const later = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; redraw(); }); };
+    const saveSoon = () => { clearTimeout(saveT); saveT = setTimeout(save, 400); };
+    const showZoom = () => (status.textContent = `Zoom ${Math.round(st.v.z * 100)}%`);
+    const sp = (e) => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    function zoomAt(p, z) { const v = st.v; z = clampZ(z); const wx = p.x / v.z + v.x, wy = p.y / v.z + v.y; st.v = { x: wx - p.x / z, y: wy - p.y / z, z }; showZoom(); }
+
+    /* ---- drawing ---- */
+    function tplBox() {
+      const bw = st.tw || W;
+      if (st.tpl === "array") {
+        const n = (opt.values || new Array(8)).length, cell = Math.min(56, (bw - 32) / n);
+        return { n, cell, x0: (bw - cell * n) / 2, y0: 22, w: cell * n, h: cell + 16 };
+      }
+      const n = 5, cell = Math.min(46, (bw - 32) / n);
+      return { n, cell, x0: (bw - cell * n) / 2, y0: 22, w: cell * n, h: cell * n };
+    }
     function drawTpl() {
       if (st.tpl === "none") return;
-      const bw = st.bw || W;
+      const { n, cell, x0, y0 } = tplBox();
       ctx.strokeStyle = pal.muted; ctx.lineWidth = 1.6; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       if (st.tpl === "array") {
-        const vals = opt.values || new Array(8).fill(""), n = vals.length;
-        const cell = Math.min(56, (bw - 32) / n), x0 = (bw - cell * n) / 2, y0 = 22;
+        const vals = opt.values || new Array(8).fill("");
         vals.forEach((v, i) => {
           ctx.strokeRect(x0 + i * cell, y0, cell, cell);
           if (v !== "") { ctx.fillStyle = pal.ink; ctx.font = `700 ${Math.round(cell * 0.36)}px "Space Mono", monospace`; ctx.fillText(v, x0 + i * cell + cell / 2, y0 + cell / 2 + 1); }
           ctx.fillStyle = pal.muted; ctx.font = `12px "Space Mono", monospace`; ctx.fillText(i, x0 + i * cell + cell / 2, y0 + cell + 11);
         });
       } else {
-        const n = 5, cell = Math.min(46, (bw - 32) / n), x0 = (bw - cell * n) / 2, y0 = 22;
         for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) ctx.strokeRect(x0 + c * cell, y0 + r * cell, cell, cell);
       }
     }
@@ -113,38 +143,63 @@
       for (let i = 1; i < n; i++) seg(p, i, done && i === n - 1);
     }
     function redraw() {
-      if (!W) return;
+      if (!W || !st.v) return;
       palette();
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
-      const k = dpr * scale(); ctx.setTransform(k, 0, 0, k, 0, 0);
+      setT();
       drawTpl();
       st.s.forEach((s) => stroke(s, true));
       if (cur) stroke(cur, false);
+      paintGrid();
       el.querySelector(".sp-hint").hidden = st.s.length > 0 || !!cur || st.tpl !== "none";
     }
-    const save = () => { st.t = Date.now(); if (st.s.length || db[key]) { db[key] = { s: st.s, bw: st.bw, h: st.h, tpl: st.tpl, t: st.t }; persist(); } };
+    const save = () => { clearTimeout(saveT); st.t = Date.now(); if (st.s.length || db[key]) { db[key] = { s: st.s, h: st.h, tpl: st.tpl, tw: st.tw, v: st.v, t: st.t }; persist(); } };
     const snap = () => { undo.push(st.s.slice()); if (undo.length > 60) undo.shift(); };
 
     const at = (e) => {
-      const r = cv.getBoundingClientRect(), k = scale();
+      const r = cv.getBoundingClientRect(), v = st.v;
       const pr = e.pointerType === "pen" && e.pressure > 0 ? e.pressure : 0.45;
-      const q = (v) => Math.round(v * 10) / 10;
-      return [q((e.clientX - r.left) / k), q((e.clientY - r.top) / k), q(1.3 + pr * 3.3)];
+      const q = (n, k) => Math.round(n * k) / k;
+      return [q((e.clientX - r.left) / v.z + v.x, 10), q((e.clientY - r.top) / v.z + v.y, 10), q((1.3 + pr * 3.3) / v.z, 100)];
     };
     function eraseAt(e) {
-      const [x, y] = at(e), rad = 13 / scale();
+      const [x, y] = at(e), rad = 13 / st.v.z;
       const keep = st.s.filter((s) => { for (let i = 0; i < s.p.length; i += 3) if (Math.hypot(s.p[i] - x, s.p[i + 1] - y) < rad) return false; return true; });
       if (keep.length !== st.s.length) { st.s = keep; redraw(); }
     }
-    const scroller = () => { let n = el.parentElement; while (n && n !== document.body) { const o = getComputedStyle(n).overflowY; if ((o === "auto" || o === "scroll") && n.scrollHeight > n.clientHeight) return n; n = n.parentElement; } return window; };
-
-    cv.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === "pen") lastPen = Date.now();
-      if (e.pointerType === "touch") {
-        if (cur || erasing || Date.now() - lastPen < 900) return;                 // the palm resting while the stylus writes
-        if (!finger) { if (!el.classList.contains("full")) scroll = { y: e.clientY, to: scroller(), id: e.pointerId }; return; }
+    function fit() {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      const add = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
+      st.s.forEach((s) => { for (let i = 0; i < s.p.length; i += 3) add(s.p[i], s.p[i + 1]); });
+      if (st.tpl !== "none") { const b = tplBox(); add(b.x0, b.y0); add(b.x0 + b.w, b.y0 + b.h); }
+      if (x0 === Infinity) st.v = { x: 0, y: 0, z: 1 };
+      else {
+        const pad = 28, z = clampZ(Math.min((W - 2 * pad) / Math.max(x1 - x0, 1), (H - 2 * pad) / Math.max(y1 - y0, 1), 1.5));
+        st.v = { x: (x0 + x1) / 2 - W / 2 / z, y: (y0 + y1) / 2 - H / 2 / z, z };
       }
-      if (cur || erasing) return;
+      redraw(); save(); showZoom();
+    }
+
+    /* ---- moving the view: one pointer drags, two pinch ---- */
+    function startGesture() {
+      const p = [...touches.values()];
+      if (!p.length) { gesture = null; return; }
+      gesture = p.length === 1 ? { n: 1, v0: { ...st.v }, p0: p[0] }
+        : { n: 2, v0: { ...st.v }, m0: { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }, d0: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1 };
+    }
+    function moveGesture() {
+      if (!gesture) return;
+      const p = [...touches.values()], v0 = gesture.v0;
+      if (gesture.n === 1) st.v = { x: v0.x - (p[0].x - gesture.p0.x) / v0.z, y: v0.y - (p[0].y - gesture.p0.y) / v0.z, z: v0.z };
+      else if (p.length > 1) {
+        const m = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+        const z = clampZ(v0.z * Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) / gesture.d0);
+        const wx = gesture.m0.x / v0.z + v0.x, wy = gesture.m0.y / v0.z + v0.y;
+        st.v = { x: wx - m.x / z, y: wy - m.y / z, z }; showZoom();
+      }
+      later();
+    }
+    function beginStroke(e) {
       e.preventDefault();
       try { cv.setPointerCapture(e.pointerId); } catch (err) {}
       snap();
@@ -153,24 +208,52 @@
       if (e.pointerType === "pen") status.textContent = "Stylus detected. Press harder for thicker lines.";
       cur = { c: color, p: at(e), id: e.pointerId };
       el.querySelector(".sp-hint").hidden = true;
-      palette(); const k = dpr * scale(); ctx.setTransform(k, 0, 0, k, 0, 0); stroke(cur, false);
+      palette(); setT(); stroke(cur, false);
+    }
+
+    cv.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "pen") lastPen = Date.now();
+      if (e.pointerType === "touch") {
+        if (erasing || (cur && !touches.has(cur.id))) return;        // the stylus is writing: this is the palm
+        if (Date.now() - lastPen < 900 || e.width * e.height > 1600) return;  // pen just lifted, or a palm-sized contact
+        e.preventDefault();
+        try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+        touches.set(e.pointerId, sp(e));
+        if (finger && touches.size === 1) { beginStroke(e); return; }
+        if (cur) { cur = null; undo.pop(); redraw(); }               // a second finger turns a finger stroke into a pinch
+        startGesture(); return;
+      }
+      if (e.pointerType === "mouse" && (e.button === 1 || e.button === 2)) {
+        e.preventDefault();
+        try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+        touches.set(e.pointerId, sp(e)); startGesture(); return;
+      }
+      if (cur || erasing) return;
+      if (e.pointerType === "pen" && gesture) { st.v = { ...gesture.v0 }; gesture = null; touches.clear(); }  // a palm landed first: undo its drag
+      beginStroke(e);
     });
     cv.addEventListener("pointermove", (e) => {
       if (e.pointerType === "pen") lastPen = Date.now();
-      if (scroll && e.pointerId === scroll.id) { const d = scroll.y - e.clientY; scroll.y = e.clientY; scroll.to.scrollBy(0, d); return; }
+      if (touches.has(e.pointerId)) {
+        touches.set(e.pointerId, sp(e));
+        if (!(cur && cur.id === e.pointerId)) { moveGesture(); return; }
+      }
       if (erasing === e.pointerId) { eraseAt(e); return; }
       if (!cur || e.pointerId !== cur.id) return;
       const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
       ctx.strokeStyle = pal[cur.c]; ctx.lineCap = "round"; ctx.lineJoin = "round";
       (evs.length ? evs : [e]).forEach((ev) => {
         const p = at(ev), n = cur.p.length;
-        if (Math.abs(p[0] - cur.p[n - 3]) + Math.abs(p[1] - cur.p[n - 2]) < 0.6) return;
+        if (Math.abs(p[0] - cur.p[n - 3]) + Math.abs(p[1] - cur.p[n - 2]) < 0.6 / st.v.z) return;
         cur.p.push(p[0], p[1], p[2]);
         seg(cur.p, cur.p.length / 3 - 1, false);
       });
     });
     function end(e) {
-      if (scroll && e.pointerId === scroll.id) { scroll = null; return; }
+      if (touches.has(e.pointerId)) {
+        touches.delete(e.pointerId);
+        if (!(cur && cur.id === e.pointerId)) { if (touches.size) startGesture(); else { gesture = null; saveSoon(); } return; }
+      }
       if (erasing === e.pointerId) { erasing = false; if (undo.length && undo[undo.length - 1].length === st.s.length) undo.pop(); save(); return; }
       if (!cur || e.pointerId !== cur.id) return;
       st.s.push({ c: cur.c, p: cur.p }); cur = null;
@@ -178,15 +261,31 @@
     }
     cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
     cv.addEventListener("contextmenu", (e) => e.preventDefault());
+    cv.addEventListener("mousedown", (e) => { if (e.button === 1) e.preventDefault(); });   // no autoscroll on middle-drag
+    // wheel moves the canvas when the pad fills its space; a small pad inside a page lets the page scroll
+    area.addEventListener("wheel", (e) => {
+      if (!(opt.fill || el.classList.contains("full") || e.ctrlKey || e.metaKey || e.shiftKey)) return;
+      e.preventDefault();
+      const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? H : 1;
+      if (e.ctrlKey || e.metaKey) zoomAt(sp(e), st.v.z * Math.exp(-e.deltaY * unit * 0.0025));
+      else {
+        let dx = e.deltaX * unit, dy = e.deltaY * unit;
+        if (e.shiftKey && !dx) { dx = dy; dy = 0; }
+        st.v = { x: st.v.x + dx / st.v.z, y: st.v.y + dy / st.v.z, z: st.v.z };
+      }
+      later(); saveSoon();
+    }, { passive: false });
 
     /* ---- toolbar ---- */
     const press = (sel, on) => el.querySelectorAll(sel).forEach((b) => b.setAttribute("aria-pressed", String(b === on)));
     const paintTpl = () => { $("tpl").setAttribute("aria-label", "Boxes to draw on: " + TPL_LABEL[st.tpl]); $("tpl").setAttribute("aria-pressed", String(st.tpl !== "none")); };
-    const paintFinger = () => { $("finger").setAttribute("aria-pressed", String(finger)); status.textContent = finger ? "Finger and stylus both draw." : "The stylus draws. A finger scrolls the page."; };
+    const paintFinger = () => {
+      $("finger").setAttribute("aria-pressed", String(finger));
+      status.textContent = finger ? "Finger and stylus draw. Two fingers move and zoom." : "The stylus draws. Drag with a finger to move, pinch to zoom.";
+    };
     function setFull(on) {
       el.classList.toggle("full", on); document.body.classList.toggle("sp-lock", on);
       $("full").innerHTML = on ? I.small : I.full; $("full").setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
-      $("more").hidden = on || !!opt.fill;
     }
     el.addEventListener("click", (e) => {
       const b = e.target.closest(".sp-t"); if (!b) return;
@@ -195,17 +294,16 @@
       if (a === "pen" || a === "erase") { tool = a; press('[data-a="pen"],[data-a="erase"]', b); }
       else if (a === "tpl") { st.tpl = TPL[(TPL.indexOf(st.tpl) + 1) % TPL.length]; paintTpl(); redraw(); save(); status.textContent = TPL_LABEL[st.tpl]; }
       else if (a === "undo") { if (undo.length) { st.s = undo.pop(); redraw(); save(); } }
-      else if (a === "clear") { if (st.s.length) { snap(); st.s = []; st.bw = W; redraw(); save(); } }
+      else if (a === "clear") { if (st.s.length) { snap(); st.s = []; st.v = { x: 0, y: 0, z: 1 }; st.tw = W; redraw(); save(); } }
+      else if (a === "fit") fit();
       else if (a === "full") setFull(!el.classList.contains("full"));
       else if (a === "close") { setFull(false); opt.onClose(); }
       else if (a === "finger") { finger = !finger; if (window.Store) Store.set("padFinger", finger || undefined); paintFinger(); }
-      else if (a === "more") { st.h += 220; area.style.height = st.h + "px"; save(); }
     });
     const onKey = (e) => { if (e.key === "Escape" && el.classList.contains("full")) { e.preventDefault(); setFull(false); } };
     addEventListener("keydown", onKey);
 
     if (!opt.fill) area.style.height = st.h + "px";
-    $("more").hidden = !!opt.fill;
     paintTpl(); paintFinger();
     const ro = window.ResizeObserver ? new ResizeObserver(resize) : null;
     if (ro) ro.observe(area); else addEventListener("resize", resize);
@@ -215,7 +313,7 @@
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(redraw);
     resize();
 
-    return { el, destroy() { ro && ro.disconnect(); mo.disconnect(); removeEventListener("keydown", onKey); document.body.classList.remove("sp-lock"); host.innerHTML = ""; } };
+    return { el, destroy() { if (gesture || st.v) save(); ro && ro.disconnect(); mo.disconnect(); removeEventListener("keydown", onKey); document.body.classList.remove("sp-lock"); host.innerHTML = ""; } };
   };
 
   /* pull a short list of numbers out of a problem's first example, for the array boxes */

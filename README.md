@@ -51,6 +51,6 @@ This validates every pattern file, regenerates `data/index.js`, and runs every c
 
 On a tablet or phone the site switches to a touch layout by itself: bigger buttons and text, a bottom navigation bar, and scratchpads. **Settings → Touch layout** can force it on or off.
 
-- **Scratchpad** (`assets/scratch.js`): on Revise cards, in the Scratch tab of every problem, and behind the Sketch button on pattern pages. The stylus draws with pressure, a finger scrolls, and a resting palm is ignored. Sketches are saved in the browser, one per card, problem or pattern (the 80 most recent are kept). They are not part of the Settings export.
+- **Scratchpad** (`assets/scratch.js`): on Revise cards, in the Scratch tab of every problem, and behind the Sketch button on pattern pages. It is an infinite canvas: the stylus draws with pressure, one finger drags the canvas, two fingers pinch to zoom, and Fit brings the whole drawing back into view. A resting palm is ignored. With a mouse: right or middle drag moves, the wheel moves, Ctrl+wheel zooms. Sketches are saved in the browser, one per card, problem or pattern (the 80 most recent are kept). They are not part of the Settings export.
 - **Solve** on a narrow screen shows Problem / Code / Scratch as tabs.
 - **Practice** shows 40 problems at a time in mixed mode, and folding groups in By pattern mode.
