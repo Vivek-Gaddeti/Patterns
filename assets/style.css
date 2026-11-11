@@ -476,3 +476,29 @@ html.touch .crumb a { display: inline-flex; align-items: center; min-height: 40p
 html.touch .pn a { min-height: 64px; justify-content: center; }
 .split { height: calc(100dvh - 63px); }
 @media (max-width: 900px) { .split { height: auto; } }
+
+/* ---------- pad: one-row toolbar, and a single-column page beside the docked pad ---------- */
+.sp-bar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.sp-bar::-webkit-scrollbar { display: none; }
+.sp-bar .sp-t { flex: none; }
+.sp-bar .sp-grow { min-width: 4px; }
+.sp-foot { flex-wrap: nowrap; padding: 4px 8px; }
+.sp-foot .sp-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-foot .sp-t { flex: none; height: 36px; min-width: 0; font-size: 12.5px; }
+html.touch .sp-bar .sp-t { min-width: 44px; height: 44px; padding: 0 8px; }
+html.touch .sp-foot .sp-t { height: 38px; font-size: 13px; }
+.sp-sheet .sp-bar .sp-t.txt { font-size: 13px; }
+@media (orientation: landscape) and (min-width: 900px) {
+  .sp-sheet { top: 0; width: 46vw; }
+  body.sheet-open { padding-right: 46vw; }
+}
+body.sheet-open .ov, body.sheet-open .phd, body.sheet-open .grid.g2, body.sheet-open .grid.g3, body.sheet-open .mcq .answers { grid-template-columns: minmax(0, 1fr); }
+body.sheet-open .phd .act { align-items: flex-start; }
+body.sheet-open .pg { padding: 0 16px; }
+body.sheet-open .nav .search-btn span, body.sheet-open .nav .streak span { display: none; }
+body.sheet-open .nav .search-btn { min-width: 44px; width: 44px; justify-content: center; padding: 0; }
+.sp-bar { gap: 4px; padding: 6px; }
+.sp-bar .sp-sep { display: none; }
+html.touch .sp-bar .sp-t { min-width: 40px; width: 40px; height: 44px; padding: 0; }
+html.touch .sp-bar .sp-t[data-c] { min-width: 36px; width: 36px; }
+@media (min-width: 700px) { html.touch .sp:not(.fill) .sp-bar .sp-t, html.touch .sp.full .sp-bar .sp-t { min-width: 46px; width: 46px; } }

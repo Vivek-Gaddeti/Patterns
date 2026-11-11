@@ -22,7 +22,9 @@
     undo: S('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>'),
     full: S('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
     small: S('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>'),
-    x: S('<path d="M6 6l12 12M18 6L6 18"/>')
+    x: S('<path d="M6 6l12 12M18 6L6 18"/>'),
+    boxes: S('<rect x="2" y="8" width="20" height="8"/><path d="M8.7 8v8M15.3 8v8"/>'),
+    trash: S('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>')
   };
   const TPL = ["none", "array", "grid"], TPL_LABEL = { none: "Boxes off", array: "Array boxes", grid: "Grid" };
   let lastPen = 0;                      // time of the last stylus event anywhere: used to ignore the resting palm
@@ -42,11 +44,12 @@
         <button class="sp-t" data-c="red" aria-pressed="false" aria-label="Red ink"><i class="sp-dot"></i></button>
         <button class="sp-t" data-c="blue" aria-pressed="false" aria-label="Blue ink"><i class="sp-dot"></i></button>
         <span class="sp-sep"></span>
-        <button class="sp-t txt" data-a="tpl"></button>
+        <button class="sp-t" data-a="tpl">${I.boxes}</button>
         <span class="sp-grow"></span>
         <button class="sp-t" data-a="undo" aria-label="Undo">${I.undo}</button>
-        <button class="sp-t txt" data-a="clear">Clear</button>
+        <button class="sp-t" data-a="clear" aria-label="Clear the pad">${I.trash}</button>
         <button class="sp-t" data-a="full" aria-label="Full screen">${I.full}</button>
+        ${opt.onClose ? `<button class="sp-t" data-a="close" aria-label="Close scratchpad">${I.x}</button>` : ""}
       </div>
       <div class="sp-area"><canvas aria-label="Drawing area"></canvas><div class="sp-hint">Write or draw here</div></div>
       <div class="sp-foot"><span class="sp-status"></span><span class="sp-grow"></span>
@@ -54,7 +57,7 @@
         <button class="sp-t txt" data-a="more">More space</button></div>
     </div>`;
     const el = host.firstElementChild, area = el.querySelector(".sp-area"), cv = el.querySelector("canvas");
-    const ctx = cv.getContext("2d", { desynchronized: true }) || cv.getContext("2d");
+    const ctx = cv.getContext("2d");   // not "desynchronized": on Android that makes the canvas opaque black
     const $ = (a) => el.querySelector(`[data-a="${a}"]`);
     const status = el.querySelector(".sp-status");
 
@@ -178,7 +181,7 @@
 
     /* ---- toolbar ---- */
     const press = (sel, on) => el.querySelectorAll(sel).forEach((b) => b.setAttribute("aria-pressed", String(b === on)));
-    const paintTpl = () => { $("tpl").textContent = TPL_LABEL[st.tpl]; $("tpl").setAttribute("aria-pressed", String(st.tpl !== "none")); };
+    const paintTpl = () => { $("tpl").setAttribute("aria-label", "Boxes to draw on: " + TPL_LABEL[st.tpl]); $("tpl").setAttribute("aria-pressed", String(st.tpl !== "none")); };
     const paintFinger = () => { $("finger").setAttribute("aria-pressed", String(finger)); status.textContent = finger ? "Finger and stylus both draw." : "The stylus draws. A finger scrolls the page."; };
     function setFull(on) {
       el.classList.toggle("full", on); document.body.classList.toggle("sp-lock", on);
@@ -190,10 +193,11 @@
       if (b.dataset.c) { color = b.dataset.c; tool = "pen"; press("[data-c]", b); press('[data-a="pen"],[data-a="erase"]', $("pen")); return; }
       const a = b.dataset.a;
       if (a === "pen" || a === "erase") { tool = a; press('[data-a="pen"],[data-a="erase"]', b); }
-      else if (a === "tpl") { st.tpl = TPL[(TPL.indexOf(st.tpl) + 1) % TPL.length]; paintTpl(); redraw(); save(); }
+      else if (a === "tpl") { st.tpl = TPL[(TPL.indexOf(st.tpl) + 1) % TPL.length]; paintTpl(); redraw(); save(); status.textContent = TPL_LABEL[st.tpl]; }
       else if (a === "undo") { if (undo.length) { st.s = undo.pop(); redraw(); save(); } }
       else if (a === "clear") { if (st.s.length) { snap(); st.s = []; st.bw = W; redraw(); save(); } }
       else if (a === "full") setFull(!el.classList.contains("full"));
+      else if (a === "close") { setFull(false); opt.onClose(); }
       else if (a === "finger") { finger = !finger; if (window.Store) Store.set("padFinger", finger || undefined); paintFinger(); }
       else if (a === "more") { st.h += 220; area.style.height = st.h + "px"; save(); }
     });
@@ -227,9 +231,8 @@
     if (sheet) return closeScratchSheet();
     const el = document.createElement("aside");
     el.className = "sp-sheet"; el.setAttribute("aria-label", "Scratchpad");
-    el.innerHTML = `<div class="sp-sheet-h"><b>${opt.title || "Scratchpad"}</b><button class="sp-t" aria-label="Close scratchpad">${I.x}</button></div><div class="sp-sheet-b"></div>`;
+    el.innerHTML = `<div class="sp-sheet-b"></div>`;
     document.body.append(el); document.body.classList.add("sheet-open");
-    sheet = { el, pad: mountScratch(el.querySelector(".sp-sheet-b"), { key: opt.key, values: opt.values, fill: true }) };
-    el.querySelector(".sp-sheet-h button").onclick = closeScratchSheet;
+    sheet = { el, pad: mountScratch(el.querySelector(".sp-sheet-b"), { key: opt.key, values: opt.values, fill: true, onClose: () => closeScratchSheet() }) };
   };
 })();
