@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learn — Patterns</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+  .bar .input { flex: 1; min-width: 200px; }
+  .grp td { background: var(--bg-2) !important; padding: 9px 14px; font: 700 13px var(--f-head); border-top: var(--b) !important; }
+  .grp .cnt { font: 400 12px var(--f-mono); color: var(--muted); margin-left: 8px; }
+  .pt { text-decoration: none; display: block; }
+  .pt b { font: 600 15px var(--f-head); display: block; }
+  .pt span { font-size: 13px; color: var(--muted); }
+  .pt:hover b { text-decoration: underline; }
+  .freq { display: inline-flex; gap: 3px; vertical-align: middle; }
+  .freq i { width: 9px; height: 9px; border: 1.5px solid var(--line); }
+  .freq i.on { background: var(--ink); border-color: var(--ink); }
+  .pm { display: flex; align-items: center; gap: 8px; min-width: 120px; } .pm .meter { flex: 1; }
+  .num { font: 700 12px var(--f-mono); color: var(--muted); }
+  @media (max-width: 760px) { .hide-m { display: none; } }
+  .soon { font: 700 10.5px var(--f-mono); color: var(--muted); border: 1px dashed var(--line); padding: 0 5px; margin-left: 6px; }
+</style>
+<script src="data/catalog.js"></script>
+<script src="data/index.js"></script>
+<script src="assets/app.js"></script>
+</head>
+<body data-page="learn">
+<main class="wrap">
+  <div class="ph row" style="justify-content:space-between;align-items:end">
+    <div><h1>Learn</h1><p>All 50 patterns, grouped by family. Each page has the template, worked examples you can run, pitfalls and a practice set.</p></div>
+    <a class="btn" href="roadmap.html">${ICON}</a>
+  </div>
+  <div class="bar">
+    <input class="input" id="q" placeholder="Filter patterns…" aria-label="Filter patterns">
+    <div class="seg" id="st"><button class="on" data-v="all">All</button><button data-v="0">Not started</button><button data-v="1">Learning</button><button data-v="2">Learned</button><button data-v="3">Revise</button></div>
+    <select class="input" id="fq" aria-label="OA frequency"><option value="0">Any OA frequency</option><option value="3">High only</option><option value="2">Medium and up</option></select>
+  </div>
+  <div class="tscroll"><table class="tbl" id="tbl"></table></div>
+  <p class="muted small" style="margin-top:12px"><span class="freq"><i class="on"></i><i class="on"></i><i class="on"></i></span> OA frequency: how often the pattern shows up in online assessments.</p>
+</main>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const $ = (s) => document.querySelector(s);
+  document.querySelector(".ph a.btn").innerHTML = `${ICON.map} Study roadmap`;
+  let st = "all";
+  const freq = (n) => `<span class="freq" title="${FREQ[n]} OA frequency">${[1, 2, 3].map((i) => `<i class="${i <= n ? "on" : ""}"></i>`).join("")}</span>`;
+  function draw() {
+    const q = $("#q").value.toLowerCase(), fq = +$("#fq").value;
+    let html = `<thead><tr><th style="width:44px">#</th><th>Pattern</th><th class="hide-m">OA freq</th><th>Status</th><th class="hide-m">Practice</th><th class="hide-m">Next review</th></tr></thead><tbody>`;
+    let any = false;
+    GROUPS.forEach((g) => {
+      const ps = CATALOG.filter((p) => p.group === g.id && (!q || (p.title + p.sub).toLowerCase().includes(q)) && (st === "all" || Progress.status(p.id) === +st) && p.freq >= fq);
+      if (!ps.length) return; any = true;
+      html += `<tr class="grp"><td colspan="6"><span class="sw" style="background:var(--${g.color});margin-right:8px"></span>${g.name}<span class="cnt">${ps.length}</span></td></tr>`;
+      ps.forEach((p) => {
+        const probs = PROBLEMS.filter((x) => x.pat === p.id), done = probs.filter((x) => Progress.prob(x.id)?.s === "solved").length;
+        const c = SRS.get(p.id), s = Progress.status(p.id);
+        const next = !c ? `<span class="muted">—</span>` : c.due <= today() ? `<span class="tag y">due</span>` : `in ${daysFromNow(c.due)}d`;
+        html += `<tr><td class="num">${String(p.num).padStart(2, "0")}</td>
+          <td><a class="pt" href="${patternUrl(p.id)}"><b>${p.title}${READY.has(p.id) ? "" : '<span class="soon">draft</span>'}</b><span>${p.sub}</span></a></td>
+          <td class="hide-m">${freq(p.freq)}</td><td><span class="status ${STATUS_CLS[s]}">${STATUS[s]}</span></td>
+          <td class="hide-m"><div class="pm"><div class="meter"><i style="width:${Math.min(100, done / p.n * 100)}%"></i></div><span class="mono small">${done}/${p.n}</span></div></td>
+          <td class="hide-m mono small">${next}</td></tr>`;
+      });
+    });
+    $("#tbl").innerHTML = html + (any ? "" : `<tr><td colspan="6"><div class="empty">No pattern matches these filters.</div></td></tr>`) + "</tbody>";
+  }
+  $("#q").oninput = draw; $("#fq").onchange = draw;
+  $("#st").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; st = b.dataset.v; $("#st").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); draw(); };
+  draw();
+});
+</script>
+</body>
+</html>

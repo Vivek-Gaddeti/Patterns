@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toolkit — Patterns</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .tk { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 36px; align-items: start; }
+  .toc { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 2px; font: 600 14px var(--f-head); }
+  .toc a { text-decoration: none; padding: 6px 10px; border-left: 3px solid var(--line); }
+  .toc a:hover { background: var(--bg-2); }
+  .toc a.on { border-left-color: var(--ink); background: var(--yellow-l); }
+  @media (max-width: 900px) { .tk { grid-template-columns: minmax(0, 1fr); } .toc { position: static; flex-direction: row; flex-wrap: wrap; } .toc a { border: var(--b); } }
+  .tsec { padding-bottom: 34px; }
+  .tsec h2 { font: 700 23px var(--f-head); margin-bottom: 6px; }
+  .tsec > p { color: var(--muted); max-width: 720px; }
+  .sz td:first-child { font: 700 14px var(--f-mono); white-space: nowrap; }
+  .sz td:nth-child(2) { font: 700 14px var(--f-mono); }
+  .sz tr.hl td { background: var(--yellow-l); }
+  .cost td:nth-child(2) { font: 700 13.5px var(--f-mono); white-space: nowrap; }
+  .cost .slow { color: var(--red); }
+  .snip { margin-bottom: 18px; }
+  .snip h3 { font-size: 16px; margin-bottom: 8px; }
+  .code { background: var(--code-bg); color: var(--code-text); border: var(--b); padding: 12px 14px; font: 13px/1.6 var(--f-mono); white-space: pre; overflow-x: auto; margin: 8px 0 0; }
+  .tle li { margin-bottom: 8px; } .tle b { font-family: var(--f-head); }
+  .ck label { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .ck label:first-of-type { border-top: 0; }
+</style>
+<script src="data/catalog.js"></script>
+<script src="data/index.js"></script>
+<script src="assets/app.js"></script>
+<script src="data/toolkit.js"></script>
+<script src="assets/editor.js"></script>
+</head>
+<body data-page="toolkit">
+<main class="wrap">
+  <div class="ph"><h1>Python OA toolkit</h1><p>Everything that isn't a pattern but still decides whether you pass: which complexity the constraints allow, what Python operations really cost, how OA platforms feed input, and the library tricks worth knowing by heart.</p></div>
+  <div class="tk">
+    <nav class="toc" id="toc">
+      <a href="#sizes">Input size → complexity</a><a href="#costs">What Python ops cost</a><a href="#input">OA input formats</a><a href="#library">Library cheat sheet</a><a href="#tle">Fixing TLE</a><a href="#checklist">Pre-OA checklist</a>
+    </nav>
+    <div>
+      <section class="tsec" id="sizes"><h2>Input size → complexity</h2>
+        <p>Read the constraints <b>before</b> you think about the solution. Python manages roughly <b>10⁷ simple operations per second</b>, and OA time limits are usually 1–4 seconds.</p>
+        <div class="tscroll"><table class="tbl sz"><thead><tr><th>n up to</th><th>Max complexity</th><th>Usually means</th></tr></thead><tbody>
+          <tr><td>10–12</td><td>O(n!)</td><td>Try every permutation (backtracking)</td></tr>
+          <tr><td>20–25</td><td>O(2ⁿ · n)</td><td>Every subset, bitmask DP</td></tr>
+          <tr><td>100–500</td><td>O(n³)</td><td>Interval DP, Floyd–Warshall, triple loops</td></tr>
+          <tr><td>1,000–5,000</td><td>O(n²)</td><td>2-D DP, nested loops over pairs</td></tr>
+          <tr class="hl"><td>10⁵ – 10⁶</td><td>O(n log n) or O(n)</td><td>Sorting, heap, binary search, two pointers, sliding window, hashing</td></tr>
+          <tr><td>10⁹ and up</td><td>O(log n) or O(1)</td><td>Binary search on the answer, math formula</td></tr>
+        </tbody></table></div>
+        <div class="callout" style="margin-top:14px">${ICON}<p>Most OA problems have <b>n ≤ 10⁵</b>. That single line rules out every O(n²) idea, which is often the strongest hint you'll get about the pattern.</p></div>
+      </section>
+
+      <section class="tsec" id="costs"><h2>What Python operations really cost</h2>
+        <p>The usual cause of a surprise TLE is an O(n) operation hiding inside a loop.</p>
+        <div class="tscroll"><table class="tbl cost"><thead><tr><th>Operation</th><th>Cost</th><th>Use instead</th></tr></thead><tbody>
+          <tr><td><code>x in list</code></td><td class="slow">O(n)</td><td><code>x in set</code> or <code>x in dict</code>: O(1)</td></tr>
+          <tr><td><code>list.pop(0)</code>, <code>list.insert(0, x)</code></td><td class="slow">O(n)</td><td><code>deque.popleft()</code>, <code>deque.appendleft()</code>: O(1)</td></tr>
+          <tr><td><code>s += ch</code> in a loop</td><td class="slow">O(n²) total</td><td>Collect in a list, then <code>"".join(parts)</code></td></tr>
+          <tr><td><code>a[i:j]</code> slice</td><td class="slow">O(j − i)</td><td>Pass indices instead of copying</td></tr>
+          <tr><td><code>min(list)</code> / <code>max(list)</code> in a loop</td><td class="slow">O(n) each</td><td>A heap, or keep a running min / max</td></tr>
+          <tr><td><code>list.append</code>, <code>list.pop()</code></td><td>O(1)</td><td></td></tr>
+          <tr><td><code>dict</code> / <code>set</code> get, add, delete</td><td>O(1)</td><td></td></tr>
+          <tr><td><code>heappush</code>, <code>heappop</code></td><td>O(log n)</td><td></td></tr>
+          <tr><td><code>sorted()</code>, <code>list.sort()</code></td><td>O(n log n)</td><td></td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section class="tsec" id="input"><h2>OA input formats</h2>
+        <p>Platforms either call your function (like LeetCode) or make you read the input yourself from standard input. Know both before test day.</p>
+        <div class="grid g2">
+          <div class="card"><h3>Function style</h3><p class="small muted">CodeSignal, most HackerRank tasks, LeetCode. You fill in a function; the platform calls it.</p><pre class="code">def solution(nums, k):
+    # return the answer, don't print it
+    return ...</pre></div>
+          <div class="card"><h3>Full program (stdin)</h3><p class="small muted">Some HackerRank and company tests. Read everything fast, print the answer.</p><pre class="code">import sys
+def main():
+    data = sys.stdin.buffer.read().split()
+    n = int(data[0])
+    nums = list(map(int, data[1:1 + n]))
+    print(solve(nums))
+main()</pre></div>
+        </div>
+        <div class="callout warn" style="margin-top:14px">${ICON}<p><code>input()</code> is slow for 10⁵ lines. Read everything at once with <code>sys.stdin.buffer.read()</code>, and print with one <code>"\n".join(...)</code> instead of many <code>print</code> calls.</p></div>
+      </section>
+
+      <section class="tsec" id="library"><h2>Library cheat sheet</h2><p>Each block runs in your browser. Change it and press Run.</p><div id="snips"></div></section>
+
+      <section class="tsec" id="tle"><h2>Fixing a time limit exceeded</h2>
+        <ol class="tle">
+          <li><b>Check the complexity against n.</b> If n is 10⁵ and you have nested loops, no micro-optimisation will save you. You need a different pattern.</li>
+          <li><b>Look for hidden O(n) inside loops:</b> <code>in list</code>, <code>pop(0)</code>, slicing, <code>min()</code>, string <code>+=</code>.</li>
+          <li><b>Recursion:</b> raise <code>sys.setrecursionlimit</code>, or switch DFS to an explicit stack. Deep recursion is also slow in Python.</li>
+          <li><b>Memoise</b> overlapping subproblems with <code>@lru_cache(maxsize=None)</code> or a dict.</li>
+          <li><b>Avoid repeated work:</b> precompute prefix sums, sort once, build lookup dicts up front.</li>
+          <li><b>Fast I/O</b> for stdin programs (see above).</li>
+        </ol>
+      </section>
+
+      <section class="tsec" id="checklist"><h2>Pre-OA checklist</h2><p>Tick these off the day before. Saved in your browser.</p><div class="card ck" id="ck"></div></section>
+    </div>
+  </div>
+</main>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".callout").forEach((c, i) => (c.innerHTML = c.innerHTML.replace("${ICON}", i ? ICON.warn : ICON.info)));
+  const host = document.getElementById("snips");
+  SNIPPETS.forEach(([id, title, code, out]) => {
+    const d = document.createElement("div"); d.className = "snip"; d.innerHTML = `<h3>${title}</h3><div></div>`; host.append(d);
+    mountEditor(d.lastChild, { code, expected: out, title: id + ".py", key: "tk:" + id });
+  });
+  const items = ["Try the platform's practice test so the editor and input format aren't new", "Know which language version they use (Python 3)", "Read every question first, then start with the easiest", "Read constraints first and write down the target complexity", "Test edge cases: empty input, one element, duplicates, negatives, max size", "Return the answer; don't print it unless the format says so", "Keep 10 minutes at the end to re-run everything", "Quiet room, charger plugged in, stable internet"];
+  document.getElementById("ck").innerHTML = items.map((t, i) => `<label><input type="checkbox" class="cb" data-i="${i}" ${Store.get("tkck:" + i) ? "checked" : ""}><span>${t}</span></label>`).join("");
+  document.getElementById("ck").onchange = (e) => Store.set("tkck:" + e.target.dataset.i, e.target.checked || undefined);
+  const links = [...document.querySelectorAll("#toc a")];
+  const io = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) links.forEach((l) => l.classList.toggle("on", l.getAttribute("href") === "#" + en.target.id)); }), { rootMargin: "-20% 0px -70% 0px" });
+  document.querySelectorAll(".tsec").forEach((s) => io.observe(s));
+});
+</script>
+</body>
+</html>

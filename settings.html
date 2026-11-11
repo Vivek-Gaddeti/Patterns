@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings — Patterns</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .set { max-width: 760px; }
+  .set .card { margin-bottom: 16px; }
+  .srow { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .srow:first-of-type { border-top: 0; }
+  .srow b { font: 600 15px var(--f-head); display: block; } .srow span.d { font-size: 13.5px; color: var(--muted); }
+</style>
+<script src="data/catalog.js"></script>
+<script src="data/index.js"></script>
+<script src="assets/app.js"></script>
+<script src="data/roadmap.js"></script>
+</head>
+<body data-page="">
+<main class="wrap set">
+  <div class="ph"><h1>Settings</h1><p>Your progress lives only in this browser. Export a backup now and then, especially before clearing browser data or switching laptops.</p></div>
+
+  <div class="card"><h3 style="margin-bottom:4px">Your OA</h3>
+    <div class="srow"><div><b>OA date</b><span class="d">Used for the countdown and your plan.</span></div><input class="input" type="date" id="oa"></div>
+    <div class="srow"><div><b>Study plan</b><span class="d">Changing it restarts the plan from today.</span></div><select class="input" id="plan"></select></div>
+  </div>
+
+  <div class="card"><h3 style="margin-bottom:4px">Appearance</h3>
+    <div class="srow"><div><b>Theme</b></div><div class="seg" id="theme"><button data-v="">System</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+    <div class="srow"><div><b>Touch layout</b><span class="d">Bigger buttons, a bottom bar and scratchpads open by default. Auto turns it on for tablets and phones.</span></div><div class="seg" id="touch"><button data-v="">Auto</button><button data-v="on">On</button><button data-v="off">Off</button></div></div>
+  </div>
+
+  <div class="card"><h3 style="margin-bottom:4px">Backup</h3>
+    <div class="srow"><div><b>Export progress</b><span class="d">Statuses, solved problems, notes, code and revision schedule, as one JSON file.</span></div><button class="btn" id="exp">${ICON}</button></div>
+    <div class="srow"><div><b>Import progress</b><span class="d">Replaces what's in this browser with a backup file.</span></div><label class="btn" style="cursor:pointer"><span id="impIcon"></span>Import<input type="file" accept="application/json,.json" id="imp" hidden></label></div>
+  </div>
+
+  <div class="card" style="border-color:var(--red)"><h3 style="margin-bottom:4px">Reset</h3>
+    <div class="srow"><div><b>Erase all progress</b><span class="d">Can't be undone. Export a backup first.</span></div><button class="btn pink" id="reset">Erase everything</button></div>
+  </div>
+</main>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const $ = (s) => document.querySelector(s);
+  $("#exp").innerHTML = `${ICON.download} Export`; $("#impIcon").innerHTML = ICON.upload;
+  const oa = Store.get("oaDate");
+  if (oa != null) $("#oa").value = new Date(oa * 864e5).toISOString().slice(0, 10);
+  $("#oa").onchange = (e) => { if (!e.target.value) return; Store.set("oaDate", Math.floor(new Date(e.target.value + "T12:00").getTime() / 864e5)); toast("OA date saved"); };
+  $("#plan").innerHTML = `<option value="">No plan</option>` + Object.entries(PLANS).map(([k, p]) => `<option value="${k}" ${Store.get("plan") === k ? "selected" : ""}>${p.label}</option>`).join("");
+  $("#plan").onchange = (e) => { Store.set("plan", e.target.value || undefined); Store.set("planStart", e.target.value ? today() : undefined); toast("Plan updated"); };
+  const th = Store.get("theme", "");
+  $("#theme").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === th));
+  $("#theme").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.set("theme", b.dataset.v || undefined); location.reload(); };
+  const tp = Store.get("touch", "");
+  $("#touch").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === tp));
+  $("#touch").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; Store.set("touch", b.dataset.v || undefined); location.reload(); };
+  $("#exp").onclick = () => {
+    const blob = new Blob([JSON.stringify({ app: "patterns", version: 2, saved: new Date().toISOString(), data: Store.all() }, null, 1)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `patterns-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $("#imp").onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { const j = JSON.parse(await f.text()); if (j.app !== "patterns" || typeof j.data !== "object") throw 0;
+      if (!confirm("Replace the progress in this browser with this backup?")) return;
+      Store.replace(j.data); toast("Backup restored"); setTimeout(() => (location.href = "index.html"), 700);
+    } catch (err) { toast("That file isn't a Patterns backup"); }
+  };
+  $("#reset").onclick = () => { if (confirm("Erase all progress, notes and code? This can't be undone.")) { clearDemo(); toast("Everything erased"); setTimeout(() => (location.href = "index.html"), 700); } };
+});
+</script>
+</body>
+</html>

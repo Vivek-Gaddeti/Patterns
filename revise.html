@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revise — Patterns</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .modes { margin-bottom: 20px; }
+  .rcard { border: var(--b3); background: var(--surface); }
+  .rcard-h { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: var(--b); background: var(--accent-l, var(--bg-2)); flex-wrap: wrap; }
+  .rcard-h h2 { font: 700 22px var(--f-head); }
+  .rcard-h p { margin: 0; width: 100%; color: var(--muted); font-size: 14.5px; }
+  .rcard-b { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+  .rcard-b > div { padding: 16px 18px; }
+  .rcard-b > div + div { border-left: var(--b); }
+  @media (max-width: 760px) { .rcard-b { grid-template-columns: 1fr; } .rcard-b > div + div { border-left: 0; border-top: var(--b); } }
+  .rcard ul { margin: 4px 0 14px; padding-left: 18px; font-size: 14.5px; }
+  .rcard li { margin-bottom: 4px; }
+  .tplpre { margin: 6px 0 10px; background: var(--code-bg); color: var(--code-text); border: var(--b); padding: 12px 14px; font: 13px/1.6 var(--f-mono); white-space: pre; overflow-x: auto; }
+  .session { max-width: 860px; margin: 0 auto; }
+  .front { text-align: center; padding: 50px 24px; }
+  .front h2 { font: 800 30px var(--f-display); text-transform: uppercase; margin: 10px 0; }
+  .rate { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+  .rate .btn { flex-direction: column; gap: 0; padding: 10px; }
+  .rate .btn small { font: 400 12px var(--f-mono); opacity: .8; }
+  @media (max-width: 560px) { .rate { grid-template-columns: 1fr 1fr; } }
+  .session.wide { max-width: 1100px; }
+  .front.has-pad { text-align: left; padding: 24px; }
+  .front.has-pad .pad-wrap { margin-top: 18px; }
+  /* landscape: question on the left, pad on the right where the writing hand rests */
+  @media (min-width: 900px) and (orientation: landscape) {
+    .front.has-pad { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+    .front.has-pad .pad-wrap { margin-top: 0; }
+  }
+  html.touch .front h2 { font-size: 32px; }
+  html.touch .rate .btn { min-height: 60px; }
+  html.touch .rate .btn small { font-size: 13px; }
+  html.touch .rcard ul { font-size: 15.5px; } html.touch .tplpre { font-size: 14.5px; }
+  html.touch .spot .opt { min-height: 58px; font-size: 16px; } html.touch .spot .q { font-size: 20px; }
+  html.touch .drill-list a { min-height: 46px; font-size: 15px; }
+  html.touch .cards-grid p { font-size: 14.5px; }
+  .prog { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .prog .meter { flex: 1; }
+  .cards-grid a.card { padding: 14px 16px; }
+  .cards-grid h4 { font-size: 15px; margin-bottom: 4px; display: flex; gap: 8px; align-items: center; }
+  .cards-grid p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .cards-grid .row { margin-top: 10px; }
+  .modal-card { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 90; display: flex; align-items: flex-start; justify-content: center; padding: 8vh 16px 16px; overflow: auto; }
+  .modal-card .rcard { width: min(900px, 100%); box-shadow: 6px 6px 0 var(--ink); }
+  .drill { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .drill-list a { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: var(--b); margin-bottom: 8px; text-decoration: none; font: 600 14px var(--f-head); background: var(--surface); }
+  .drill-list a.on { background: var(--yellow); color: #000; }
+  @media (max-width: 760px) { .drill { grid-template-columns: minmax(0, 1fr); } }
+  .spot .q { font: 600 19px/1.45 var(--f-head); margin: 10px 0 18px; }
+  .spot .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .spot .opt { text-align: left; padding: 12px 14px; border: var(--b); background: var(--surface); box-shadow: var(--sh-sm); cursor: pointer; font: 600 15px var(--f-head); }
+  .spot .opt:hover { background: var(--yellow-l); }
+  .spot .opt.right { background: var(--green); color: #000; } .spot .opt.wrong { background: var(--pink); color: #000; }
+  @media (max-width: 560px) { .spot .answers { grid-template-columns: 1fr; } }
+</style>
+<script src="data/catalog.js"></script>
+<script src="data/index.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/editor.js"></script>
+<script src="assets/judge.js"></script>
+<script src="assets/scratch.js"></script>
+</head>
+<body data-page="revise">
+<main class="wrap">
+  <div class="ph"><h1>Revise</h1><p>Patterns come back just before you'd forget them. Rate how well you remembered and the next review is scheduled for you.</p></div>
+  <div class="seg modes" id="modes">
+    <button data-m="due" class="on">Due today</button><button data-m="cards">Revision cards</button><button data-m="drill">Template drill</button><button data-m="spot">Spot the pattern</button>
+  </div>
+  <div id="view"></div>
+</main>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const $ = (s) => document.querySelector(s), view = $("#view");
+  const col = (id) => groupOf(patternOf(id).group).color;
+
+  function cardHtml(id, closeBtn) {
+    const p = patternOf(id), s = SUMMARY[id];
+    const head = `<div class="rcard-h" style="--accent-l:var(--${col(id)}-l)"><span class="sw" style="background:var(--${col(id)})"></span><h2>${p.title}</h2><span class="grow"></span>
+      <a class="btn sm" href="${patternUrl(id)}">Full page</a>${closeBtn ? `<button class="btn sm" id="closeCard">${ICON.x}</button>` : ""}<p>${md(s ? s.oneLine : p.sub)}</p></div>`;
+    if (!s) return `<div class="rcard">${head}<div style="padding:18px"><div class="empty">The revision card for this pattern hasn't been written yet.</div></div></div>`;
+    return `<div class="rcard">${head}<div class="rcard-b">
+      <div><div class="lab">Spot it when</div><ul>${s.signals.map((x) => `<li>${md(x)}</li>`).join("")}</ul>
+        <div class="lab">Watch out</div><ul>${s.pitfalls.map((x) => `<li>${md(x)}</li>`).join("")}</ul></div>
+      <div><div class="lab">Template</div><pre class="tplpre">${highlightPy(s.template)}</pre><span class="tag">${s.cx}</span></div></div></div>`;
+  }
+
+  /* ---------- due today: spaced revision session ---------- */
+  function due() {
+    const q = SRS.due();
+    if (!q.length) {
+      const up = SRS.upcoming(5);
+      view.innerHTML = `<div class="session"><div class="card" style="text-align:center;padding:40px"><h2 style="font:800 26px var(--f-display);text-transform:uppercase">All caught up</h2>
+        <p class="muted">Nothing is due today.${up.length ? " Coming up:" : " Mark patterns as “Learned” and they'll be scheduled here."}</p>
+        ${up.map((p) => `<div class="row" style="justify-content:center;margin:6px 0"><span class="sw" style="background:var(--${col(p.id)})"></span>${p.title}<span class="tag">in ${daysFromNow(SRS.get(p.id).due)}d</span></div>`).join("")}
+        <div class="row" style="justify-content:center;margin-top:18px"><button class="btn primary" data-go="spot">Spot-the-pattern drill</button><button class="btn" data-go="cards">Browse cards</button></div></div></div>`;
+      return;
+    }
+    let i = 0;
+    const show = (flipped) => {
+      killPad();
+      const p = q[i], padOn = isTouch || Store.get("padOn");
+      const bar = `<div class="prog"><span class="mono small">${i + 1} / ${q.length}</span><div class="meter y"><i style="width:${i / q.length * 100}%"></i></div></div>`;
+      if (!flipped) {
+        view.innerHTML = `<div class="session ${padOn ? "wide" : ""}">${bar}<div class="card front ${padOn ? "has-pad" : ""}"><div><span class="lab">Recall before you flip</span><h2>${p.title}</h2>
+          <p class="muted">When would you use it? What does the template look like? Say it or sketch it, then check.</p>
+          <button class="btn primary" id="flip" style="margin-top:12px">Show card <kbd style="margin-left:6px">Space</kbd></button>
+          <div><button class="btn sm pad-open" id="padOpen">${ICON.pen} ${padOn ? "Hide scratchpad" : "Open scratchpad"}</button></div></div>
+          ${padOn ? `<div class="pad-wrap" id="padHost"></div>` : ""}</div></div>`;
+        $("#flip").onclick = () => show(true);
+        $("#padOpen").onclick = () => { Store.set("padOn", padOn ? undefined : true); show(false); };
+        if (padOn) pad = mountScratch($("#padHost"), { key: "rev:" + p.id, height: 340 });
+      } else {
+        const iv = SRS.preview(p.id);
+        view.innerHTML = `<div class="session">${bar}${cardHtml(p.id)}
+          <p class="center muted small" style="text-align:center;margin:16px 0 0">How well did you remember it?</p>
+          <div class="rate">${[["Forgot", "pink"], ["Hard", ""], ["Good", "green"], ["Easy", "yellow"]].map(([t, c], g) => `<button class="btn ${c}" data-g="${g}">${t}<small>${iv[g]}d<span class="kbd-hint"> · key ${g + 1}</span></small></button>`).join("")}</div>
+          ${padOn ? `<div class="lab" style="margin:22px 0 6px">Your sketch</div><div id="padHost"></div>` : ""}</div>`;
+        view.querySelectorAll("[data-g]").forEach((b) => (b.onclick = () => rate(+b.dataset.g)));
+        if (padOn) pad = mountScratch($("#padHost"), { key: "rev:" + p.id, height: 280 });
+      }
+      onkey = (e) => { if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return; if (!flipped && e.code === "Space") { e.preventDefault(); show(true); } if (flipped && "1234".includes(e.key)) rate(+e.key - 1); };
+    };
+    const rate = (g) => {
+      const d = SRS.rate(q[i].id, g); toast(`Next review in ${d} day${d > 1 ? "s" : ""}`);
+      i++; if (i < q.length) show(false); else { onkey = null; due(); }
+    };
+    show(false);
+  }
+  let onkey = null, pad = null;
+  const killPad = () => { if (pad) { pad.destroy(); pad = null; } };
+  addEventListener("keydown", (e) => onkey && onkey(e));
+
+  /* ---------- all revision cards ---------- */
+  function cards() {
+    let f = "all";
+    const draw = () => {
+      const ps = CATALOG.filter((p) => f === "all" || (f === "ready" ? SUMMARY[p.id] : Progress.status(p.id) === +f));
+      view.querySelector("#cg").innerHTML = ps.map((p) => { const c = SRS.get(p.id);
+        return `<a class="card cards-grid-i" href="#card=${p.id}" style="text-decoration:none"><h4><span class="sw" style="background:var(--${col(p.id)})"></span>${p.title}</h4><p>${SUMMARY[p.id] ? md(SUMMARY[p.id].oneLine) : p.sub}</p>
+          <div class="row"><span class="status ${STATUS_CLS[Progress.status(p.id)]}">${STATUS[Progress.status(p.id)]}</span>${c ? `<span class="tag">${c.due <= today() ? "due" : "in " + daysFromNow(c.due) + "d"}</span>` : ""}${SUMMARY[p.id] ? "" : '<span class="tag">draft</span>'}</div></a>`; }).join("") || `<div class="empty">No cards match.</div>`;
+    };
+    view.innerHTML = `<div class="row" style="margin-bottom:14px"><div class="seg" id="cf"><button class="on" data-f="all">All</button><button data-f="2">Learned</button><button data-f="3">Revise</button><button data-f="ready">Cards written</button></div>
+      <span class="grow"></span><span class="muted small">Tip: print this page for a paper cheat sheet.</span></div><div class="grid g3 cards-grid" id="cg"></div>`;
+    $("#cf").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; f = b.dataset.f; $("#cf").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); draw(); };
+    draw();
+  }
+  function openCard(id) {
+    const m = document.createElement("div"); m.className = "modal-card"; m.innerHTML = cardHtml(id, true);
+    document.body.append(m);
+    const close = () => { m.remove(); history.replaceState(null, "", location.pathname + "#cards"); };
+    m.onclick = (e) => { if (e.target === m || e.target.closest("#closeCard")) close(); };
+    addEventListener("keydown", function esc(e) { if (e.key === "Escape") { close(); removeEventListener("keydown", esc); } });
+  }
+
+  /* ---------- template drill ---------- */
+  function drill(pid) {
+    const ids = Object.keys(SUMMARY).filter((k) => SUMMARY[k].drill);
+    pid = pid && SUMMARY[pid]?.drill ? pid : ids[0];
+    const s = SUMMARY[pid], d = s.drill;
+    view.innerHTML = `<div class="drill"><div class="drill-list"><div class="lab" style="margin-bottom:8px">Pick a pattern</div>${ids.map((k) => `<a href="#drill=${k}" class="${k === pid ? "on" : ""}"><span class="sw" style="background:var(--${col(k)})"></span>${patternOf(k).title}</a>`).join("")}</div>
+      <div><div class="card" style="margin-bottom:12px"><div class="lab">Write it from memory</div><h3 style="font-size:19px;margin:4px 0">${patternOf(pid).title}</h3><p style="margin:0">${md(d.task)}</p></div>
+        <div id="ded"></div>
+        <div class="runbar" style="border:var(--b);border-top:0"><button class="btn sm green" id="chk">${ICON.check} Check</button><button class="btn sm" id="peek">${ICON.eye} Peek at template</button><span class="grow"></span><span class="mono small" id="dres"></span></div>
+        <div id="dout"></div><pre class="tplpre hide" id="ptpl">${highlightPy(s.template)}</pre></div></div>`;
+    const ed = mountEditor($("#ded"), { code: d.starter, title: d.fn + ".py", key: "drill:" + pid, bare: true, onRun: () => $("#chk").click() });
+    $("#peek").onclick = () => $("#ptpl").classList.toggle("hide");
+    $("#chk").onclick = async () => {
+      $("#dres").textContent = "Checking…";
+      const r = await Judge.run(ed.value, { fn: d.fn, call: d.call, conv: d.conv }, d.tests, { timeoutMs: 4000, onStatus: (t) => ($("#dres").textContent = t) });
+      if (r.error || r.tle) { $("#dres").innerHTML = `<span class="tag bad">${r.tle ? "Too slow" : "Error"}</span>`; $("#dout").innerHTML = r.error ? `<div class="callout bad" style="margin-top:10px"><p class="mono small">${esc(r.error)}</p></div>` : ""; return; }
+      const pass = r.results.filter((x) => x.ok).length, ok = pass === r.results.length;
+      $("#dres").innerHTML = `<span class="tag ${ok ? "ok" : "bad"}">${pass}/${r.results.length} tests</span>`;
+      $("#dout").innerHTML = ok ? `<div class="callout ok" style="margin-top:10px">${ICON.check}<p><b>Nailed it.</b> You can write this template from memory.</p></div>`
+        : `<div class="callout bad" style="margin-top:10px">${ICON.x}<p>${r.results.map((x, i) => x.ok ? "" : `Test ${i + 1}: input <code>${esc(d.tests[i][0])}</code> expected <code>${esc(d.tests[i][1])}</code>, got <code>${esc(x.got)}</code><br>`).join("")}</p></div>`;
+    };
+    PyRunner.warm();
+  }
+
+  /* ---------- spot the pattern ---------- */
+  function spot() {
+    const order = SPOT.map((_, i) => i).sort(() => Math.random() - 0.5).slice(0, 10);
+    let k = 0, score = 0;
+    const next = () => {
+      if (k >= order.length) { view.innerHTML = `<div class="session card" style="text-align:center;padding:40px"><h2 style="font:800 28px var(--f-display);text-transform:uppercase">${score} / ${order.length}</h2><p class="muted">Patterns you missed are worth a look on the Revision cards tab.</p><button class="btn primary" data-go="spot">Go again</button></div>`; return; }
+      const [q, ans] = SPOT[order[k]], why = SUMMARY[ans] ? SUMMARY[ans].oneLine : patternOf(ans).sub;
+      const others = CATALOG.filter((p) => p.id !== ans).sort(() => Math.random() - 0.5).slice(0, 3).map((p) => p.id);
+      const opts = [ans, ...others].sort(() => Math.random() - 0.5);
+      view.innerHTML = `<div class="session spot"><div class="prog"><span class="mono small">${k + 1} / ${order.length} · score ${score}</span><div class="meter b"><i style="width:${k / order.length * 100}%"></i></div></div>
+        <div class="card"><span class="lab">Which pattern?</span><div class="q">${md(q)}</div><div class="answers">${opts.map((o) => `<button class="opt" data-o="${o}">${patternOf(o).title}</button>`).join("")}</div>
+        <div id="why" class="hide" style="margin-top:14px"></div></div></div>`;
+      view.querySelectorAll(".opt").forEach((b) => (b.onclick = () => {
+        if (view.querySelector(".opt.right")) return;
+        const ok = b.dataset.o === ans; if (ok) score++;
+        b.classList.add(ok ? "right" : "wrong"); view.querySelector(`[data-o="${ans}"]`).classList.add("right");
+        $("#why").classList.remove("hide");
+        $("#why").innerHTML = `<div class="callout ${ok ? "ok" : "bad"}"><p><b>${ok ? "Correct." : "Not quite."}</b> ${md(why)} <a href="${patternUrl(ans)}">Open pattern</a></p></div><button class="btn primary" style="margin-top:12px" id="nx">Next ${ICON.arrow}</button>`;
+        $("#nx").onclick = () => { k++; next(); };
+      }));
+    };
+    next();
+  }
+
+  /* ---------- routing ---------- */
+  const modes = { due, cards, drill, spot };
+  function route() {
+    onkey = null; killPad();
+    const h = location.hash.slice(1), [m, arg] = h.split("=");
+    const mode = m === "card" ? "cards" : modes[m] ? m : "due";
+    $("#modes").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.m === mode));
+    document.querySelectorAll(".modal-card").forEach((x) => x.remove());
+    modes[mode](arg);
+    if (m === "card" && arg) openCard(arg);
+  }
+  $("#modes").onclick = (e) => { const b = e.target.closest("button"); if (b) location.hash = b.dataset.m; };
+  view.addEventListener("click", (e) => { const g = e.target.closest("[data-go]"); if (g) { location.hash = g.dataset.go; if (g.dataset.go === "spot") route(); } });
+  addEventListener("hashchange", route);
+  route();
+});
+</script>
+</body>
+</html>

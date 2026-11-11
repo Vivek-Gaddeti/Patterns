@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock OA — Patterns</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .setup { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .setup { grid-template-columns: 1fr; } }
+  .opt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .opt-row:first-of-type { border-top: 0; }
+  .opt-row b { font: 600 15px var(--f-head); display: block; } .opt-row span { font-size: 13.5px; color: var(--muted); }
+  .rules { margin: 0; padding-left: 18px; font-size: 14.5px; } .rules li { margin-bottom: 6px; }
+  .testbar { position: sticky; top: 60px; z-index: 30; background: #111; color: #fff; display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: var(--b3); flex-wrap: wrap; }
+  .testbar .q { padding: 6px 12px; border: 2px solid #555; background: transparent; color: #fff; font: 600 13.5px var(--f-head); cursor: pointer; display: flex; gap: 8px; align-items: center; }
+  .testbar .q.on { background: var(--yellow); color: #000; border-color: var(--yellow); }
+  .testbar .q i { width: 9px; height: 9px; border: 1.5px solid currentColor; }
+  .testbar .q i.pass { background: var(--green); } .testbar .q i.part { background: var(--orange); }
+  .timer { margin-left: auto; font: 700 20px var(--f-mono); padding: 2px 10px; border: 2px solid #fff; display: flex; gap: 8px; align-items: center; }
+  .timer svg { width: 18px; height: 18px; }
+  .timer.low { background: var(--pink); color: #000; border-color: var(--pink); }
+  .test .split { height: calc(100vh - 116px); }
+  .score { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+  .score .big { font: 800 64px/1 var(--f-display); }
+  .qres { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); }
+  .qres:first-of-type { border-top: 0; }
+  .qres .n { width: 34px; height: 34px; display: grid; place-items: center; border: var(--b); font: 700 14px var(--f-mono); }
+  .qres .n.pass { background: var(--green); color: #000; } .qres .n.fail { background: var(--pink); color: #000; }
+</style>
+<script src="data/catalog.js"></script>
+<script src="data/index.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/editor.js"></script>
+<script src="assets/judge.js"></script>
+<script src="assets/scratch.js"></script>
+<script src="assets/solve.js"></script>
+</head>
+<body data-page="mock">
+<div id="app"></div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const app = document.getElementById("app");
+  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  const pick = (n) => {
+    // OA-style: one easy warm-up, then mediums, from different (mostly high-frequency) patterns
+    const shuffle = (a) => a.map((x) => [Math.random(), x]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+    const often = (p) => patternOf(p.pat).freq >= 2;
+    const easy = shuffle(PROBLEMS.filter((p) => p.d === "Easy" && often(p)));
+    const med = shuffle(PROBLEMS.filter((p) => p.d === "Medium" && often(p)));
+    const pick = [easy[0]];
+    for (const p of med) { if (pick.length >= n) break; if (!pick.some((q) => q.pat === p.pat)) pick.push(p); }
+    return pick.filter(Boolean).map((p) => p.id);
+  };
+
+  /* ---------- 1. setup ---------- */
+  function setup() {
+    document.body.dataset.nofoot = "";
+    const mocks = Store.get("mocks", []);
+    app.innerHTML = `<main class="wrap"><div class="ph"><h1>Mock OA</h1><p>A timed test that feels like HackerRank or CodeSignal: mixed problems, patterns hidden, no hints, hidden test cases.</p></div>
+      <div class="setup"><div class="card"><h3 style="margin-bottom:6px">Set up your test</h3>
+        <div class="opt-row"><div><b>Length</b><span>Most OAs give 60–90 minutes.</span></div><div class="seg" id="len"><button data-v="60">60 min</button><button data-v="90" class="on">90 min</button><button data-v="120">120 min</button></div></div>
+        <div class="opt-row"><div><b>Problems</b><span>Easy first, then medium.</span></div><div class="seg" id="cnt"><button data-v="2">2</button><button data-v="3" class="on">3</button></div></div>
+        <div class="opt-row"><div><b>Patterns</b><span>Hidden until the results screen.</span></div><span class="tag solid">hidden</span></div>
+        <button class="btn primary" id="start" style="width:100%;margin-top:14px;padding:13px">${ICON.clock} Start the test</button></div>
+        <div><div class="card" style="background:var(--yellow-l);margin-bottom:16px"><h3 style="margin-bottom:8px">Rules</h3><ol class="rules">
+          <li>The timer starts as soon as you press Start and keeps running if you refresh.</li><li>Switch between questions any time. Your code is kept.</li>
+          <li><b>Run samples</b> shows the visible tests. <b>Submit</b> also runs hidden tests, whose inputs you won't see.</li>
+          <li>Your best submission per question counts. The test ends when time runs out.</li><li>No hints, no pattern names, no solutions until the end.</li></ol></div>
+          <div class="card"><h3 style="margin-bottom:8px">Past attempts</h3>${mocks.length ? `<table class="tbl" style="border:0"><thead><tr><th>When</th><th>Score</th><th>Time</th></tr></thead><tbody>${mocks.slice().reverse().map((m) => `<tr><td>${new Date(m.when).toLocaleDateString()}</td><td><b>${m.score} / ${m.of}</b></td><td class="mono small">${m.mins} / ${m.len} min</td></tr>`).join("")}</tbody></table>` : `<p class="muted small" style="margin:0">No attempts yet.</p>`}</div></div></div></main>`;
+    let len = 90, cnt = 3;
+    const seg = (id, set) => { const el = document.getElementById(id); el.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; set(+b.dataset.v); el.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); }; };
+    seg("len", (v) => (len = v)); seg("cnt", (v) => (cnt = v));
+    document.getElementById("start").onclick = () => {
+      const ids = pick(cnt);
+      ids.forEach((id) => Store.set("code:mock:" + id, undefined));
+      Store.set("mockActive", { ids, start: Date.now(), len, res: {} });
+      test();
+    };
+  }
+
+  /* ---------- 2. the test ---------- */
+  let tick;
+  function test() {
+    const T = Store.get("mockActive");
+    app.innerHTML = `<div class="test"><div class="testbar">${T.ids.map((id, i) => `<button class="q ${i ? "" : "on"}" data-i="${i}"><i class="${state(T, id)}"></i>Question ${i + 1}</button>`).join("")}
+      <span class="timer" id="timer">${ICON.clock}<span></span></span><button class="btn sm yellow" id="finish">Finish test</button></div>
+      ${T.ids.map((id, i) => `<div class="ws ${i ? "hide" : ""}" data-ws="${i}"></div>`).join("")}</div>`;
+    T.ids.forEach((id, i) => mountSolve(app.querySelector(`[data-ws="${i}"]`), id, { mock: true, onSubmit: (ok, summary) => {
+      const A = Store.get("mockActive"); const prev = A.res[id];
+      if (!prev || !prev.ok) A.res[id] = { ok, summary, at: Date.now() };
+      Store.set("mockActive", A); paintTabs();
+    } }));
+    app.querySelector(".testbar").onclick = (e) => { const b = e.target.closest(".q"); if (!b) return; app.querySelectorAll(".q").forEach((x) => x.classList.toggle("on", x === b)); app.querySelectorAll(".ws").forEach((w) => w.classList.toggle("hide", w.dataset.ws !== b.dataset.i)); };
+    document.getElementById("finish").onclick = () => { if (confirm("Finish the test now? You can't go back.")) results(); };
+    const tEl = document.querySelector("#timer span");
+    const upd = () => { const left = Math.max(0, Math.round((T.start + T.len * 6e4 - Date.now()) / 1000)); tEl.textContent = fmt(left); document.getElementById("timer").classList.toggle("low", left < 300); if (!left) results(); };
+    upd(); clearInterval(tick); tick = setInterval(upd, 1000);
+    addEventListener("beforeunload", warn);
+  }
+  const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
+  const state = (T, id) => (T.res[id] ? (T.res[id].ok ? "pass" : "part") : "");
+  function paintTabs() { const T = Store.get("mockActive"); app.querySelectorAll(".q").forEach((b, i) => (b.querySelector("i").className = state(T, T.ids[i]))); }
+
+  /* ---------- 3. results ---------- */
+  function results() {
+    clearInterval(tick); removeEventListener("beforeunload", warn); PyRunner.stop();
+    const T = Store.get("mockActive"); if (!T) return setup();
+    const score = T.ids.filter((id) => T.res[id]?.ok).length;
+    const mins = Math.min(T.len, Math.round((Date.now() - T.start) / 6e4));
+    const mocks = Store.get("mocks", []); mocks.push({ when: Date.now(), score, of: T.ids.length, mins, len: T.len }); Store.set("mocks", mocks.slice(-30));
+    Store.set("mockActive", undefined);
+    const weak = [];
+    T.ids.forEach((id) => { const r = T.res[id]; Progress.setProb(id, { s: r?.ok ? "solved" : "attempted" }); if (!r?.ok) weak.push(PROBLEMS.find((p) => p.id === id).pat); });
+    app.innerHTML = `<main class="wrap"><div class="ph"><h1>Results</h1></div>
+      <div class="card" style="margin-bottom:18px"><div class="score"><div class="big">${score}/${T.ids.length}</div><div><b style="font:700 18px var(--f-head)">${score === T.ids.length ? "Full marks. Try a longer or harder set next." : score ? "Good progress. Fix the misses below." : "Tough one. Learn the patterns below, then retry."}</b>
+        <div class="muted">${mins} of ${T.len} minutes used</div></div></div></div>
+      <div class="card"><h3 style="margin-bottom:6px">Question by question</h3>${T.ids.map((id, i) => { const p = PROBLEMS.find((x) => x.id === id), r = T.res[id], pat = patternOf(p.pat);
+        return `<div class="qres"><span class="n ${r?.ok ? "pass" : "fail"}">${i + 1}</span><div><b style="font-weight:600">${p.title}</b> <span class="tag ${p.d.toLowerCase()}">${p.d}</span>
+          <div class="small muted">${r ? (r.ok ? "Accepted" : "Best: " + r.summary + " tests") : "Not submitted"} · Pattern: <a href="${patternUrl(pat.id)}">${pat.title}</a></div></div>
+          <a class="btn sm" href="solve.html#${id}">Review with hints</a></div>`; }).join("")}</div>
+      <div class="row" style="margin-top:18px">${weak.length ? `<button class="btn primary" id="addRev">${ICON.cards} Add ${weak.length} missed pattern${weak.length > 1 ? "s" : ""} to today's revision</button>` : ""}<button class="btn" id="again">Take another mock</button><a class="btn ghost" href="index.html">Back to home</a></div></main>`;
+    const add = document.getElementById("addRev");
+    if (add) add.onclick = () => { weak.forEach((id) => { Store.set("st:" + id, 3); SRS.schedule(id, 0); }); add.disabled = true; toast("Added to today's revision"); };
+    document.getElementById("again").onclick = setup;
+  }
+
+  Store.get("mockActive") ? test() : setup();
+});
+</script>
+</body>
+</html>

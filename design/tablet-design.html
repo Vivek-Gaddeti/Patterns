@@ -1,0 +1,449 @@
+<title>Patterns Tablet Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: a design review sheet. Each section = a true-size tablet screen on the left of the notes that explain it. */
+:root {
+  --ink: #111; --text: #111; --muted: #5b5750; --line: #111;
+  --bg: #FFFDF5; --bg-2: #F5F0E8; --surface: #fff;
+  --yellow: #FFD23F; --yellow-l: #FFF6D1;
+  --pink: #FF6B6B; --pink-l: #FFE6E6;
+  --blue: #74B9FF; --blue-l: #E6F2FF;
+  --green: #88D498; --green-l: #E9F6EC;
+  --red: #E5484D;
+  --on-accent: #111;
+  --code-bg: #16151C; --code-text: #EFEAE0; --code-line: #2A2833;
+  --pen-ink: #111; --pen-pink: #E5484D; --pen-blue: #2B7FD9;
+  --b: 2px solid var(--line); --b3: 3px solid var(--line);
+  --sh: 4px 4px 0 0 var(--ink);
+  --f-display: 'Syne', 'Arial Black', sans-serif;
+  --f-head: 'Space Grotesk', system-ui, sans-serif;
+  --f-body: 'Inter', system-ui, sans-serif;
+  --f-mono: 'Space Mono', ui-monospace, Consolas, monospace;
+  --tap: 48px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #EDE8DD; --text: #EDE8DD; --muted: #A9A398; --line: #4A4754;
+    --bg: #131218; --bg-2: #1A1920; --surface: #1F1E26;
+    --yellow-l: #39321C; --pink-l: #3A2326; --blue-l: #1D2838; --green-l: #1D3123;
+    --code-bg: #0E0D12; --pen-ink: #EDE8DD; --pen-pink: #FF8A8A; --pen-blue: #8CC4FF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #EDE8DD; --text: #EDE8DD; --muted: #A9A398; --line: #4A4754;
+  --bg: #131218; --bg-2: #1A1920; --surface: #1F1E26;
+  --yellow-l: #39321C; --pink-l: #3A2326; --blue-l: #1D2838; --green-l: #1D3123;
+  --code-bg: #0E0D12; --pen-ink: #EDE8DD; --pen-pink: #FF8A8A; --pen-blue: #8CC4FF;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font: 16px/1.6 var(--f-body); padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+h1 { font: 800 clamp(28px, 5vw, 44px)/1.05 var(--f-display); text-transform: uppercase; margin: 0; text-wrap: balance; }
+h1 i { color: var(--pink); font-style: normal; }
+h2 { font: 800 22px/1.15 var(--f-display); text-transform: uppercase; margin: 0; text-wrap: balance; }
+h3 { font: 700 17px/1.3 var(--f-head); margin: 0; }
+p { margin: 0; }
+.lede { max-width: 62ch; color: var(--muted); font-size: 17px; }
+.eyebrow { font: 700 12.5px var(--f-mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.head { display: flex; flex-direction: column; gap: 12px; }
+.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0; border: var(--b3); background: var(--surface); padding: 0; margin: 0; list-style: none; }
+.changes li { padding: 14px 16px; border-right: var(--b); border-bottom: var(--b); margin: 0 -2px -2px 0; font-size: 15px; }
+.changes b { display: block; font: 700 15.5px var(--f-head); }
+.sec { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
+.sec > * { min-width: 0; }
+.sec.wide { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 900px) { .sec { grid-template-columns: minmax(0, 1fr); } }
+.notes { display: flex; flex-direction: column; gap: 12px; }
+.notes ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.live { align-self: flex-start; font: 700 12px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; background: var(--green); color: var(--on-accent); border: var(--b); padding: 2px 8px; }
+.still { align-self: flex-start; font: 700 12px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; background: var(--bg-2); border: var(--b); padding: 2px 8px; }
+
+/* a tablet screen */
+.screen { border: var(--b3); background: var(--bg); box-shadow: 6px 6px 0 var(--ink); display: flex; flex-direction: column; }
+.screen.narrow { max-width: 430px; }
+.top { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: var(--b3); }
+.logo { font: 800 18px var(--f-display); margin-right: auto; }
+.logo i { color: var(--pink); font-style: normal; }
+.body { padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+.bottom { display: grid; grid-template-columns: repeat(5, 1fr); border-top: var(--b3); background: var(--surface); }
+.bottom span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 60px; font: 600 12.5px var(--f-head); border-right: 1px solid var(--line); }
+.bottom span:last-child { border-right: 0; }
+.bottom span.on { background: var(--yellow); color: var(--on-accent); }
+.bottom svg { width: 22px; height: 22px; }
+
+.btn { min-height: var(--tap); padding: 0 18px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: var(--b); background: var(--surface); color: var(--text); font: 700 15.5px var(--f-head); cursor: pointer; box-shadow: 3px 3px 0 var(--ink); touch-action: manipulation; }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.btn:focus-visible, .tool:focus-visible, summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.btn.yellow { background: var(--yellow); color: var(--on-accent); }
+.btn.green { background: var(--green); color: var(--on-accent); }
+.btn.pink { background: var(--pink); color: var(--on-accent); }
+.btn svg { width: 18px; height: 18px; }
+.ic { width: var(--tap); height: var(--tap); display: inline-grid; place-items: center; border: var(--b); background: var(--surface); }
+.ic svg { width: 20px; height: 20px; }
+.tag { font: 700 13px var(--f-mono); border: 1.5px solid var(--line); padding: 2px 8px; background: var(--surface); white-space: nowrap; }
+.tag.e { background: var(--green-l); } .tag.m { background: var(--yellow-l); } .tag.h { background: var(--pink-l); }
+.seg { display: flex; border: var(--b); background: var(--surface); }
+.seg span, .seg button { flex: 1; min-height: var(--tap); display: grid; place-items: center; padding: 0 12px; font: 700 15px var(--f-head); border: 0; border-right: var(--b); background: transparent; color: var(--text); white-space: nowrap; }
+.seg > :last-child { border-right: 0; }
+.seg .on { background: var(--yellow); color: var(--on-accent); }
+
+/* revise card */
+.card { border: var(--b3); background: var(--surface); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.card h3 { font: 800 24px/1.1 var(--f-display); text-transform: uppercase; }
+.answer { border-top: var(--b); padding-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+.code { background: var(--code-bg); color: var(--code-text); font: 15px/1.65 var(--f-mono); padding: 14px 16px; margin: 0; overflow-x: auto; white-space: pre; font-variant-ligatures: none; }
+.code .k { color: #FF8FA3; font-weight: 700; } .code .c { color: #8C877E; font-style: italic; } .code .n { color: #FFB86B; } .code .f { color: #FFD23F; }
+.rate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.rate .btn { flex-direction: column; gap: 0; min-height: 60px; padding: 4px; }
+.rate small { font: 400 12.5px var(--f-mono); }
+@media (max-width: 460px) { .rate { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* scratchpad */
+.pad { border: var(--b3); background: var(--surface); display: flex; flex-direction: column; }
+.pad-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-bottom: var(--b); background: var(--bg-2); align-items: center; }
+.tool { min-width: var(--tap); height: var(--tap); padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: var(--b); background: var(--surface); color: var(--text); font: 700 14px var(--f-head); cursor: pointer; touch-action: manipulation; }
+.tool svg { width: 20px; height: 20px; }
+.tool[aria-pressed="true"] { background: var(--yellow); color: var(--on-accent); }
+.dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); }
+.tool[aria-pressed="true"] .dot { outline: 2px solid var(--on-accent); outline-offset: 2px; }
+.pad-gap { margin-left: auto; }
+.pad-canvas { position: relative; height: 340px; background-color: var(--surface);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--muted) 45%, transparent) 1px, transparent 1.4px); background-size: 22px 22px; }
+.pad-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; display: block; }
+.pad-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 12px; border-top: var(--b); font: 13.5px var(--f-mono); color: var(--muted); }
+.pad-foot b { color: var(--text); }
+
+/* solve */
+.split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
+.split > * { min-width: 0; }
+.split .l { border-right: var(--b3); display: flex; flex-direction: column; }
+.split .r { display: flex; flex-direction: column; background: var(--code-bg); }
+@media (max-width: 700px) { .split { grid-template-columns: minmax(0, 1fr); } .split .l { border-right: 0; border-bottom: var(--b3); } }
+.stmt { padding: 16px; display: flex; flex-direction: column; gap: 10px; font-size: 16px; }
+.stmt code, .inl { font: 14.5px var(--f-mono); background: var(--bg-2); border: 1px solid var(--line); padding: 1px 5px; }
+.keys { display: flex; gap: 6px; padding: 8px; overflow-x: auto; background: var(--bg-2); border-top: var(--b); }
+.keys span { flex: none; min-width: 46px; height: 46px; display: grid; place-items: center; padding: 0 10px; border: var(--b); background: var(--surface); font: 700 15px var(--f-mono); }
+.runbar { display: flex; gap: 10px; padding: 10px; background: var(--surface); border-top: var(--b); flex-wrap: wrap; align-items: center; }
+.runbar .t { margin-left: auto; font: 700 14px var(--f-mono); }
+.minipad { margin: 0 16px 16px; height: 150px; border: var(--b); position: relative; background-color: var(--surface);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--muted) 45%, transparent) 1px, transparent 1.4px); background-size: 22px 22px; }
+.minipad svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* practice */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.chips span { flex: none; min-height: 44px; display: grid; place-items: center; padding: 0 16px; border: var(--b); background: var(--surface); font: 600 15px var(--f-head); }
+.chips .on { background: var(--ink); color: var(--bg); }
+details.grp { border: var(--b); background: var(--surface); }
+details.grp + details.grp { margin-top: -2px; }
+.grp summary { list-style: none; cursor: pointer; min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 8px 14px; font: 700 17px var(--f-head); touch-action: manipulation; }
+.grp summary::-webkit-details-marker { display: none; }
+.grp summary .chev { width: 20px; height: 20px; flex: none; transition: transform .15s ease; }
+.grp[open] summary .chev { transform: rotate(90deg); }
+.grp summary .cnt { margin-left: auto; font: 700 14px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { width: 72px; height: 10px; border: 1.5px solid var(--line); background: var(--bg-2); flex: none; }
+.bar i { display: block; height: 100%; background: var(--green); }
+.prow { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 14px; border-top: 1px solid var(--line); font: 600 16px var(--f-head); }
+.prow .st { width: 16px; height: 16px; border: 2px solid var(--line); flex: none; }
+.prow .st.done { background: var(--green); } .prow .st.due { background: var(--yellow); }
+.prow .tag { margin-left: auto; }
+.prow svg { width: 18px; height: 18px; flex: none; color: var(--muted); }
+
+/* sizes */
+.sizes { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+.cmp { border: var(--b); background: var(--surface); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.cmp .rowx { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.cmp .lab { font: 700 12.5px var(--f-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); width: 54px; flex: none; }
+.old-btn { height: 30px; padding: 0 12px; border: var(--b); background: var(--surface); font: 700 13.5px var(--f-head); display: inline-flex; align-items: center; }
+.old-cb { width: 19px; height: 19px; border: var(--b); }
+.new-cb { width: 48px; height: 48px; display: grid; place-items: center; border: 1px dashed var(--muted); }
+.new-cb i { width: 28px; height: 28px; border: var(--b); background: var(--green); display: block; }
+.next { border: var(--b3); background: var(--yellow-l); padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="page">
+  <header class="head">
+    <span class="eyebrow">Design proposal · tablet and stylus</span>
+    <h1>Patterns<i>.</i> on your tab</h1>
+    <p class="lede">Every screen below is drawn at real size, so on your tablet the buttons are as big as they will be in the site. The scratchpad in the first screen works: try it with your stylus.</p>
+    <ul class="changes">
+      <li><b>Scratchpad</b>Write and draw on Revise, Solve and pattern examples.</li>
+      <li><b>48px tap targets</b>Buttons, tabs, rows and checkboxes, up from 30px and 19px.</li>
+      <li><b>Bigger small text</b>Tags 13px, code 15px.</li>
+      <li><b>Bottom navigation</b>Five pages one tap away, on touch screens only.</li>
+      <li><b>Practice by pattern</b>50 folding groups replace one list of 397 rows.</li>
+      <li><b>Code key row</b>Tab, brackets, colon and quotes above the on-screen keyboard.</li>
+    </ul>
+  </header>
+
+  <!-- 1. REVISE -->
+  <section class="sec">
+    <div class="screen">
+      <div class="top"><span class="logo">PATTERNS<i>.</i></span><span class="tag">3 of 7 due</span></div>
+      <div class="body">
+        <div class="card">
+          <span class="eyebrow">Recall before you flip</span>
+          <h3>Two Pointers</h3>
+          <p>Is there a pair in <span class="inl">[1, 3, 4, 6, 8, 11]</span> that adds up to 10? Sketch how the two pointers move, then check the card.</p>
+          <div class="pad" id="pad">
+            <div class="pad-bar" role="toolbar" aria-label="Scratchpad tools">
+              <button class="tool" id="t-pen" aria-pressed="true" aria-label="Pen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-1L19 8l-3-3L5 16l-1 4z"/><path d="M14 7l3 3"/></svg></button>
+              <button class="tool" id="t-erase" aria-pressed="false" aria-label="Eraser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 20h12"/><path d="M5 15l9-9 5 5-9 9H7l-2-2a2 2 0 010-3z"/></svg></button>
+              <button class="tool" id="c-ink" aria-pressed="true" aria-label="Black ink"><span class="dot" style="background: var(--pen-ink)"></span></button>
+              <button class="tool" id="c-pink" aria-pressed="false" aria-label="Red ink"><span class="dot" style="background: var(--pen-pink)"></span></button>
+              <button class="tool" id="c-blue" aria-pressed="false" aria-label="Blue ink"><span class="dot" style="background: var(--pen-blue)"></span></button>
+              <button class="tool" id="t-array" aria-pressed="true">Array boxes</button>
+              <button class="tool pad-gap" id="t-undo" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+              <button class="tool" id="t-clear">Clear</button>
+            </div>
+            <div class="pad-canvas"><canvas id="cv" aria-label="Drawing area"></canvas></div>
+            <div class="pad-foot"><span id="pad-status">Draw with your stylus. A finger scrolls the page.</span><button class="tool" id="t-finger" aria-pressed="false" style="margin-left:auto">Draw with finger</button></div>
+          </div>
+          <button class="btn yellow" id="show">Show card</button>
+          <div class="answer" id="answer" hidden>
+            <p><b>Use it when</b> the array is sorted and you need a pair. Start at both ends; move the left pointer up if the sum is too small, the right one down if it is too big.</p>
+<pre class="code"><span class="k">def</span> <span class="f">pair_sum</span>(a, target):
+    i, j = <span class="n">0</span>, len(a) - <span class="n">1</span>
+    <span class="k">while</span> i &lt; j:
+        s = a[i] + a[j]
+        <span class="k">if</span> s == target: <span class="k">return</span> [i, j]
+        <span class="k">if</span> s &lt; target: i += <span class="n">1</span>
+        <span class="k">else</span>: j -= <span class="n">1</span>
+    <span class="k">return</span> []</pre>
+            <div class="rate">
+              <span class="btn pink">Forgot<small>1d</small></span><span class="btn">Hard<small>2d</small></span><span class="btn green">Good<small>4d</small></span><span class="btn yellow">Easy<small>7d</small></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <span class="live">Working demo</span>
+      <h2>Revise with a pen</h2>
+      <ul>
+        <li>The card asks you to recall, and now gives you the paper to do it on.</li>
+        <li><b>Array boxes</b> puts the example on the page so you draw pointers on it, not the boxes.</li>
+        <li>The stylus draws and presses harder for thicker lines. A finger scrolls, so your palm does not leave marks.</li>
+        <li>The eraser removes whole strokes. Undo steps back one action.</li>
+        <li>In the site, each card and problem keeps its own sketch.</li>
+        <li>Rating buttons are 60px tall and drop the "key 1" hints on touch screens.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 2. SOLVE landscape -->
+  <section class="sec">
+    <div class="screen">
+      <div class="top"><span class="logo">PATTERNS<i>.</i></span><span class="tag m">Medium</span><span class="tag">Widest Tank</span></div>
+      <div class="split">
+        <div class="l">
+          <div class="seg"><span>Problem</span><span class="on">Scratch</span><span>Tests</span></div>
+          <div class="stmt">
+            <p><b>Widest Tank.</b> Given wall heights <code>h</code>, pick two walls that hold the most water. Return that amount.</p>
+            <p><code>h = [1, 8, 6, 2, 5, 4, 8, 3, 7]</code> gives <code>49</code></p>
+          </div>
+          <div class="minipad" aria-hidden="true">
+            <svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMid meet" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <g stroke="var(--pen-ink)" stroke-width="2.4"><path d="M40 120V104M68 120V28M96 120V50M124 120V96M152 120V62M180 120V74M208 120V28M236 120V86M264 120V40"/><path d="M30 121c80 2 160-2 244 1"/></g>
+              <g stroke="var(--pen-blue)" stroke-width="2.2"><path d="M70 44c60-3 130 2 192-1"/><path d="M74 60c50 3 120-2 186 1"/><path d="M72 78c64-2 126 3 190-1"/></g>
+              <g stroke="var(--pen-pink)" stroke-width="2.4"><path d="M68 140v-12M63 133l5-6 5 6"/><path d="M264 140v-12M259 133l5-6 5 6"/></g>
+            </svg>
+          </div>
+        </div>
+        <div class="r">
+<pre class="code" style="flex:1"><span class="k">def</span> <span class="f">widest_tank</span>(h):
+    i, j = <span class="n">0</span>, len(h) - <span class="n">1</span>
+    best = <span class="n">0</span>
+    <span class="k">while</span> i &lt; j:
+        <span class="c"># your code here</span>
+        <span class="k">pass</span>
+    <span class="k">return</span> best</pre>
+          <div class="keys" aria-label="Code key row"><span>Tab</span><span>:</span><span>( )</span><span>[ ]</span><span>=</span><span>"</span><span>_</span><span>#</span><span>&lt;</span><span>&gt;</span><span>Undo</span></div>
+          <div class="runbar"><span class="btn green">Run samples</span><span class="btn yellow">Submit</span><span class="t">04:12</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <span class="still">Layout only</span>
+      <h2>Solve, landscape</h2>
+      <ul>
+        <li>The left side gets a <b>Scratch</b> tab, so you dry-run the example beside your code.</li>
+        <li>A key row sits above the on-screen keyboard with the characters Python needs most.</li>
+        <li>Code is 15px. Run and Submit are full-size buttons at the bottom, near your hand.</li>
+        <li>With a keyboard attached, the key row hides and the shortcuts work as today.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 3. SOLVE portrait + PRACTICE -->
+  <section class="sec">
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; align-items: start;">
+      <div class="screen">
+        <div class="top"><span class="logo">PATTERNS<i>.</i></span><span class="tag">Widest Tank</span></div>
+        <div class="seg" style="border-width:0 0 2px"><span>Problem</span><span class="on">Code</span><span>Scratch</span></div>
+<pre class="code"><span class="k">def</span> <span class="f">widest_tank</span>(h):
+    i, j = <span class="n">0</span>, len(h) - <span class="n">1</span>
+    best = <span class="n">0</span>
+    <span class="k">while</span> i &lt; j:
+        <span class="k">pass</span>
+    <span class="k">return</span> best</pre>
+        <div class="keys"><span>Tab</span><span>:</span><span>( )</span><span>[ ]</span><span>=</span><span>"</span><span>_</span><span>#</span></div>
+        <div class="runbar"><span class="btn green">Run samples</span><span class="btn yellow">Submit</span></div>
+      </div>
+      <div class="screen">
+        <div class="top"><span class="logo">PATTERNS<i>.</i></span><span class="ic" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span></div>
+        <div class="body">
+          <div class="chips"><span class="on">All</span><span>Due</span><span>Unsolved</span><span>Easy</span><span>Medium</span><span>Hard</span></div>
+          <div>
+            <details class="grp" open>
+              <summary><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>Two Pointers<span class="cnt">3 / 9</span><span class="bar"><i style="width:33%"></i></span></summary>
+              <div class="prow"><span class="st done"></span>Matching Weights<span class="tag e">Easy</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              <div class="prow"><span class="st done"></span>Mirror Code<span class="tag e">Easy</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              <div class="prow"><span class="st due"></span>Sink the Zeros<span class="tag e">Easy</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              <div class="prow"><span class="st"></span>Zero Triplets<span class="tag m">Medium</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+              <div class="prow"><span class="st"></span>Widest Tank<span class="tag m">Medium</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></div>
+            </details>
+            <details class="grp"><summary><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>Sliding Window<span class="cnt">0 / 8</span><span class="bar"><i style="width:0"></i></span></summary><div class="prow">Opens the same way in the site.</div></details>
+            <details class="grp"><summary><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>Binary Search<span class="cnt">5 / 8</span><span class="bar"><i style="width:62%"></i></span></summary><div class="prow">Opens the same way in the site.</div></details>
+          </div>
+        </div>
+        <div class="bottom">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Home</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h7v15H4zM13 5h7v15h-7z"/></svg>Learn</span>
+          <span class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg>Practice</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12a7 7 0 0112-5l2 2M19 12a7 7 0 01-12 5l-2-2"/><path d="M19 4v5h-5M5 20v-5h5"/></svg>Revise</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="7"/><path d="M12 9v4l3 2M9 3h6"/></svg>Mock</span>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <span class="still">Layout only · groups fold</span>
+      <h2>Solve portrait, and Practice</h2>
+      <ul>
+        <li><b>Portrait:</b> Problem, Code and Scratch become three tabs. No more scrolling between the statement and the editor.</li>
+        <li><b>Practice:</b> problems fold under their pattern with a progress count. Rows are 56px tall and the whole row opens the problem.</li>
+        <li>The pattern name stays hidden until you choose to group by it, so "guess the pattern" practice still works. The default view can stay mixed.</li>
+        <li><b>Bottom bar:</b> shows on touch screens only. Laptops keep the top navigation.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 4. SIZES -->
+  <section class="sec wide">
+    <div class="notes"><h2>Sizes, today and proposed</h2><p class="lede">Each pair is drawn at its real size. Tap them on your tablet to feel the difference.</p></div>
+    <div class="sizes">
+      <div class="cmp"><h3>Buttons</h3><div class="rowx"><span class="lab">Today</span><span class="old-btn">Run samples</span></div><div class="rowx"><span class="lab">New</span><span class="btn green">Run samples</span></div></div>
+      <div class="cmp"><h3>Checkboxes</h3><div class="rowx"><span class="lab">Today</span><span class="old-cb"></span></div><div class="rowx"><span class="lab">New</span><span class="new-cb"><i></i></span><span style="font-size:14px;color:var(--muted)">dashed line = tap area</span></div></div>
+      <div class="cmp"><h3>Tags and labels</h3><div class="rowx"><span class="lab">Today</span><span class="tag" style="font-size:11.5px">Medium</span></div><div class="rowx"><span class="lab">New</span><span class="tag m">Medium</span></div></div>
+      <div class="cmp"><h3>Code</h3><div class="rowx"><span class="lab">Today</span><span class="code" style="font-size:13.5px;padding:6px 10px">while i &lt; j:</span></div><div class="rowx"><span class="lab">New</span><span class="code" style="padding:6px 10px">while i &lt; j:</span></div></div>
+    </div>
+  </section>
+
+  <section class="next">
+    <h2>Not changing</h2>
+    <p style="max-width:65ch">The look, colours and content stay as they are, and so does the laptop layout. The bigger sizes, bottom bar and key row switch on for touch screens only.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  const $ = (id) => document.getElementById(id);
+  let strokes = [], history = [], tool = 'pen', color = 'ink', finger = false, showArray = true;
+  let cur = null, scrollY0 = null, W = 0, H = 0;
+  const ARR = [1, 3, 4, 6, 8, 11];
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  function resize() {
+    const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * d); cv.height = Math.round(H * d);
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    draw();
+  }
+  function drawArray() {
+    const cell = Math.min(54, (W - 32) / ARR.length), x0 = (W - cell * ARR.length) / 2, y0 = 26;
+    ctx.strokeStyle = css('--muted'); ctx.fillStyle = css('--text'); ctx.lineWidth = 2;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ARR.forEach((v, i) => {
+      ctx.strokeRect(x0 + i * cell, y0, cell, cell);
+      ctx.font = '700 ' + Math.round(cell * 0.38) + 'px "Space Mono", monospace';
+      ctx.fillStyle = css('--text'); ctx.fillText(v, x0 + i * cell + cell / 2, y0 + cell / 2);
+      ctx.font = '12px "Space Mono", monospace';
+      ctx.fillStyle = css('--muted'); ctx.fillText(i, x0 + i * cell + cell / 2, y0 + cell + 12);
+    });
+    ctx.textAlign = 'left'; ctx.font = '13px "Space Mono", monospace';
+    ctx.fillText('target = 10', x0, y0 + cell + 34);
+  }
+  function drawStroke(s) {
+    const p = s.pts; ctx.strokeStyle = css('--pen-' + s.color); ctx.fillStyle = ctx.strokeStyle;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (p.length === 1) { ctx.beginPath(); ctx.arc(p[0].x, p[0].y, p[0].w / 2, 0, 7); ctx.fill(); return; }
+    for (let i = 1; i < p.length; i++) {
+      const a = p[i - 1], b = p[i], m0 = i > 1 ? { x: (p[i - 2].x + a.x) / 2, y: (p[i - 2].y + a.y) / 2 } : a;
+      const m1 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      ctx.lineWidth = (a.w + b.w) / 2;
+      ctx.beginPath(); ctx.moveTo(m0.x, m0.y); ctx.quadraticCurveTo(a.x, a.y, m1.x, m1.y); ctx.stroke();
+      if (i === p.length - 1) { ctx.beginPath(); ctx.moveTo(m1.x, m1.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+    }
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    if (showArray) drawArray();
+    strokes.forEach(drawStroke);
+    if (cur) drawStroke(cur);
+  }
+  const pt = (e) => {
+    const r = cv.getBoundingClientRect();
+    const pr = e.pointerType === 'pen' && e.pressure > 0 ? e.pressure : 0.5;
+    return { x: e.clientX - r.left, y: e.clientY - r.top, w: 1.6 + pr * 3.4 };
+  };
+  const save = () => { history.push(strokes.slice()); if (history.length > 60) history.shift(); };
+  function eraseAt(p) {
+    const keep = strokes.filter((s) => !s.pts.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < 14));
+    if (keep.length !== strokes.length) { strokes = keep; draw(); }
+  }
+  cv.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' && !finger) { scrollY0 = e.clientY; cv.setPointerCapture(e.pointerId); return; }
+    if (e.pointerType === 'pen') $('pad-status').innerHTML = '<b>Stylus detected.</b> Press harder for thicker lines.';
+    e.preventDefault(); cv.setPointerCapture(e.pointerId); save();
+    if (tool === 'erase') { cur = { erase: true, pts: [] }; eraseAt(pt(e)); }
+    else { cur = { color: color, pts: [pt(e)] }; draw(); }
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (scrollY0 !== null) { window.scrollBy(0, scrollY0 - e.clientY); return; }
+    if (!cur) return;
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    (evs.length ? evs : [e]).forEach((ev) => { if (cur.erase) eraseAt(pt(ev)); else cur.pts.push(pt(ev)); });
+    if (!cur.erase) draw();
+  });
+  function end() {
+    scrollY0 = null;
+    if (!cur) return;
+    if (!cur.erase) strokes.push(cur);
+    cur = null; draw();
+  }
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+
+  function press(ids, on) { ids.forEach((id) => $(id).setAttribute('aria-pressed', id === on ? 'true' : 'false')); }
+  $('t-pen').onclick = () => { tool = 'pen'; press(['t-pen', 't-erase'], 't-pen'); };
+  $('t-erase').onclick = () => { tool = 'erase'; press(['t-pen', 't-erase'], 't-erase'); };
+  ['ink', 'pink', 'blue'].forEach((c) => { $('c-' + c).onclick = () => { color = c; tool = 'pen'; press(['c-ink', 'c-pink', 'c-blue'], 'c-' + c); press(['t-pen', 't-erase'], 't-pen'); }; });
+  $('t-array').onclick = () => { showArray = !showArray; $('t-array').setAttribute('aria-pressed', showArray); draw(); };
+  $('t-undo').onclick = () => { if (history.length) { strokes = history.pop(); draw(); } };
+  $('t-clear').onclick = () => { if (strokes.length) { save(); strokes = []; draw(); } };
+  $('t-finger').onclick = () => { finger = !finger; $('t-finger').setAttribute('aria-pressed', finger);
+    $('pad-status').textContent = finger ? 'Finger and stylus both draw. Scroll outside the pad.' : 'Draw with your stylus. A finger scrolls the page.'; };
+  $('show').onclick = () => { const a = $('answer'); a.hidden = !a.hidden; $('show').textContent = a.hidden ? 'Show card' : 'Hide card'; };
+
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(cv); else addEventListener('resize', resize);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', draw);
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+  resize();
+})();
+</script>

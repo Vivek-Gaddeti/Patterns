@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Practice — Patterns</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .lay { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; align-items: start; }
+  @media (max-width: 980px) { .lay { grid-template-columns: minmax(0, 1fr); } }
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .bar .input.q { flex: 1; min-width: 180px; }
+  .reveal { font: 600 12px var(--f-head); border: 1.5px dashed var(--line); background: transparent; padding: 1px 8px; cursor: pointer; display: inline-flex; gap: 5px; align-items: center; color: var(--muted); }
+  .reveal svg { width: 13px; height: 13px; }
+  .reveal:hover { border-style: solid; color: var(--text); }
+  .ptag { font: 600 12.5px var(--f-head); display: inline-flex; gap: 6px; align-items: center; text-decoration: none; }
+  .ptag:hover { text-decoration: underline; }
+  .grp td { background: var(--bg-2) !important; font: 700 13px var(--f-head); border-top: var(--b) !important; }
+  .side .card { margin-bottom: 16px; }
+  .diffbar { display: grid; grid-template-columns: 64px 1fr 44px; gap: 8px; align-items: center; font-size: 13.5px; margin-bottom: 8px; }
+  .mlog { border-top: 1px solid var(--line); padding: 8px 0; font-size: 13.5px; }
+  .mlog:first-of-type { border-top: 0; }
+  .mlog a { font-weight: 600; text-decoration: none; } .mlog a:hover { text-decoration: underline; }
+  .st-icon { width: 18px; height: 18px; border: var(--b); display: inline-grid; place-items: center; }
+  .st-icon.solved { background: var(--green); } .st-icon.attempted { background: var(--orange); }
+  .st-icon svg { width: 12px; height: 12px; color: #000; }
+  @media (max-width: 640px) { .hide-m { display: none; } }
+</style>
+<script src="data/catalog.js"></script>
+<script src="data/index.js"></script>
+<script src="assets/app.js"></script>
+</head>
+<body data-page="practice">
+<main class="wrap">
+  <div class="ph"><h1>Practice</h1><p>In an OA nobody tells you the pattern. Mixed mode hides it so you have to spot it yourself. Every problem opens in the editor here, with sample and hidden tests.</p></div>
+  <div class="lay">
+    <div>
+      <div class="bar">
+        <div class="seg" id="mode"><button class="on" data-v="mixed">${ICON}Mixed · pattern hidden</button><button data-v="pattern">By pattern</button></div>
+        <input class="input q" id="q" placeholder="Search problems…" aria-label="Search problems">
+      </div>
+      <div class="bar">
+        <div class="seg" id="diff"><button class="on" data-v="">All</button><button data-v="Easy">Easy</button><button data-v="Medium">Medium</button><button data-v="Hard">Hard</button></div>
+        <select class="input" id="stf" aria-label="Status"><option value="">Any status</option><option value="todo">Not tried</option><option value="attempted">Attempted</option><option value="solved">Solved</option></select>
+        <span class="grow"></span>
+        <button class="btn sm yellow" id="rand">Random unsolved</button>
+      </div>
+      <div class="tscroll"><table class="tbl" id="tbl"></table></div>
+      <div class="more-row" id="more"></div>
+    </div>
+    <aside class="side">
+      <div class="card"><div class="card-h"><h3>Solved</h3><span class="mono small" id="solvedN"></span></div><div id="diffs"></div></div>
+      <div class="card" style="background:var(--yellow-l)"><div class="card-h"><h3>Timed practice</h3></div><p class="small muted">Three mixed problems, 90 minutes, hidden tests. The closest thing to the real OA.</p><a class="btn primary" style="width:100%" href="mock.html">Start a mock OA</a></div>
+      <div class="card"><div class="card-h"><h3>Mistake log</h3></div><div id="mlog"></div></div>
+    </aside>
+  </div>
+</main>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const $ = (s) => document.querySelector(s);
+  $("#mode button").innerHTML = `Mixed · pattern hidden`;
+  let mode = "mixed", diff = "";
+  const shown = new Set();
+  const stOf = (p) => Progress.prob(p.id)?.s || "todo";
+  const icon = (s) => `<span class="st-icon ${s}" title="${s === "todo" ? "Not tried" : s}">${s === "solved" ? ICON.check : ""}</span>`;
+  const link = (p) => `<a class="btn sm ${stOf(p) === "solved" ? "" : "yellow"}" href="solve.html#${p.id}">${stOf(p) === "solved" ? "Review" : "Solve"}</a>`;
+  const patCell = (p) => mode === "pattern" || shown.has(p.id) || stOf(p) === "solved"
+    ? `<a class="ptag" href="${patternUrl(p.pat)}"><span class="sw" style="background:var(--${groupOf(patternOf(p.pat).group).color})"></span>${patternOf(p.pat).title}</a>`
+    : `<button class="reveal" data-r="${p.id}">${ICON.eye} Reveal</button>`;
+
+  function list() {
+    const q = $("#q").value.trim().toLowerCase(), sf = $("#stf").value;
+    return PROBLEMS.filter((p) => (!q || p.title.toLowerCase().includes(q)) && (!diff || p.d === diff) && (!sf || stOf(p) === sf));
+  }
+  function draw() {
+    const ps = list();
+    const head = `<thead><tr><th style="width:40px"></th><th>Problem</th><th>Level</th><th class="hide-m">Pattern</th><th></th></tr></thead><tbody>`;
+    const tr = (p) => `<tr><td>${icon(stOf(p))}</td><td><a href="solve.html#${p.id}" style="font-weight:600;text-decoration:none">${p.title}</a></td>
+      <td><span class="tag ${p.d.toLowerCase()}">${p.d}</span></td><td class="hide-m">${patCell(p)}</td><td style="text-align:right">${link(p)}</td></tr>`;
+    let body = "", left = 0;
+    if (mode === "pattern") {
+      // one folding group per pattern; searching opens every group that has a match
+      const q = $("#q").value.trim();
+      CATALOG.forEach((c) => { const g = ps.filter((p) => p.pat === c.id); if (!g.length) return;
+        const isOpen = q || open.has(c.id), done = g.filter((p) => stOf(p) === "solved").length;
+        body += `<tr class="grp" data-g="${c.id}"><td colspan="5"><span class="chev">${isOpen ? "−" : "+"}</span><span class="sw" style="background:var(--${groupOf(c.group).color});margin-right:8px"></span>${c.title}<span class="gc">${done} / ${g.length}</span></td></tr>` + (isOpen ? g.map(tr).join("") : ""); });
+    } else {
+      // stable shuffle so the order doesn't hint at the pattern; shown a page at a time
+      const all = ps.slice().sort((a, b) => hash(a.id) - hash(b.id));
+      left = Math.max(0, all.length - limit);
+      body = all.slice(0, limit).map(tr).join("");
+    }
+    $("#tbl").innerHTML = head + (body || `<tr><td colspan="5"><div class="empty">No problems match these filters.</div></td></tr>`) + "</tbody>";
+    $("#more").innerHTML = left ? `<button class="btn" id="moreBtn">Show ${Math.min(PAGE, left)} more <span class="muted">(${left} left)</span></button>` : "";
+  }
+  const PAGE = 40, open = new Set();
+  let limit = PAGE;
+  const redraw = () => { limit = PAGE; draw(); };
+  $("#more").onclick = (e) => { if (e.target.closest("#moreBtn")) { limit += PAGE; draw(); } };
+  const hash = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+
+  $("#tbl").onclick = (e) => {
+    const b = e.target.closest("[data-r]"); if (b) { shown.add(b.dataset.r); draw(); return; }
+    const g = e.target.closest("tr.grp"); if (g) { open.has(g.dataset.g) ? open.delete(g.dataset.g) : open.add(g.dataset.g); draw(); }
+  };
+  $("#mode").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; mode = b.dataset.v; $("#mode").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); redraw(); };
+  $("#diff").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; diff = b.dataset.v; $("#diff").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); redraw(); };
+  $("#q").oninput = redraw; $("#stf").onchange = redraw;
+  $("#rand").onclick = () => { const u = PROBLEMS.filter((p) => stOf(p) !== "solved"); if (!u.length) return toast("Everything is solved!"); location.href = problemUrl(u[Math.floor(Math.random() * u.length)]); };
+
+  // sidebar
+  const solved = PROBLEMS.filter((p) => stOf(p) === "solved");
+  $("#solvedN").textContent = `${solved.length} / ${PROBLEMS.length}`;
+  $("#diffs").innerHTML = ["Easy", "Medium", "Hard"].map((d) => { const all = PROBLEMS.filter((p) => p.d === d), s = solved.filter((p) => p.d === d); return `<div class="diffbar"><span class="tag ${d.toLowerCase()}">${d}</span><div class="meter"><i style="width:${s.length / all.length * 100}%"></i></div><span class="mono small">${s.length}/${all.length}</span></div>`; }).join("");
+  const att = PROBLEMS.filter((p) => stOf(p) === "attempted");
+  $("#mlog").innerHTML = att.length ? att.map((p) => `<div class="mlog"><a href="${problemUrl(p)}">${p.title}</a><div class="muted">${esc(Progress.prob(p.id).note || "No note yet.")}</div></div>`).join("") : `<p class="muted small" style="margin:0">Problems you attempt but don't solve land here, with your note on what went wrong.</p>`;
+  draw();
+});
+</script>
+</body>
+</html>

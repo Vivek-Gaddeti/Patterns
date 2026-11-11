@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap — Patterns</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .wk { margin-bottom: 18px; }
+  .wk h3 { font-size: 17px; margin-bottom: 8px; }
+  .drow { display: grid; grid-template-columns: 30px 90px 90px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .drow:first-child { border-top: 0; }
+  .drow.today { background: var(--yellow-l); box-shadow: inset 4px 0 0 var(--ink); }
+  .drow.done .ttl { color: var(--muted); text-decoration: line-through; }
+  .drow .d { font: 700 13px var(--f-mono); } .drow .dt { font-size: 12.5px; color: var(--muted); }
+  .drow .ttl { font: 600 14.5px var(--f-head); } .drow .ttl a { text-decoration: none; } .drow .ttl a:hover { text-decoration: underline; }
+  .drow .nt { font-size: 13px; color: var(--muted); }
+  .t-mock { background: var(--blue-l); } .t-review { background: var(--purple-l); } .t-learn { background: var(--green-l); }
+  @media (max-width: 640px) { .drow { grid-template-columns: 26px 1fr; } .drow .dt, .drow .tp { display: none; } }
+</style>
+<script src="data/catalog.js"></script>
+<script src="data/index.js"></script>
+<script src="assets/app.js"></script>
+<script src="data/roadmap.js"></script>
+</head>
+<body data-page="home">
+<main class="wrap">
+  <div class="ph"><h1>Roadmap</h1><p>A day-by-day plan built from how often each pattern appears in OAs. Weekly mocks show whether it's working.</p>
+    <div class="row"><div class="seg" id="plans"></div><span class="grow"></span><span class="muted small" id="oa"></span></div></div>
+  <div id="cur"></div>
+  <div id="weeks"></div>
+</main>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const $ = (s) => document.querySelector(s);
+  const mine = Store.get("plan");
+  let key = mine || "2w";
+  const oa = Store.get("oaDate");
+  $("#oa").innerHTML = oa != null ? `OA in <b>${daysFromNow(oa)} days</b> · <a href="settings.html">change</a>` : `<a href="settings.html">Set your OA date</a>`;
+  function draw() {
+    $("#plans").innerHTML = Object.entries(PLANS).map(([k, p]) => `<button data-k="${k}" class="${k === key ? "on" : ""}">${p.label}${k === mine ? " ✓" : ""}</button>`).join("");
+    const days = buildPlan(key), dayN = key === mine ? planDay() : null, start = key === mine ? Store.get("planStart") : today();
+    $("#cur").innerHTML = key !== mine ? `<div class="callout" style="margin-bottom:16px">${ICON.info}<p class="grow"><b>${PLANS[key].label}:</b> ${PLANS[key].blurb} ${CATALOG.filter((p) => p.freq >= PLANS[key].minFreq).length} patterns.</p><button class="btn sm primary" id="use">Use this plan</button></div>` : "";
+    const use = $("#use"); if (use) use.onclick = () => { Store.set("plan", key); Store.set("planStart", today()); if (Store.get("oaDate") == null) Store.set("oaDate", today() + PLANS[key].days); location.reload(); };
+    const date = (d) => new Date((start + d - 1) * 864e5).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+    let html = "";
+    for (let w = 0; w < days.length / 7; w++) {
+      html += `<div class="wk"><h3>Week ${w + 1}</h3><div class="card" style="padding:0">` + days.slice(w * 7, w * 7 + 7).map((x) => {
+        const k = `rd:${key}:${x.d}`, done = Store.get(k) || (dayN && x.d < dayN && Store.get(k) !== false);
+        const title = x.type === "learn" ? x.pats.map((id) => `<a href="${patternUrl(id)}">${patternOf(id).title}</a>`).join(", ") : `<a href="${x.type === "mock" ? "mock.html" : "revise.html"}">${x.title}</a>`;
+        return `<div class="drow ${x.d === dayN ? "today" : ""} ${done ? "done" : ""}"><input type="checkbox" class="cb" data-k="${k}" ${done ? "checked" : ""} aria-label="Day ${x.d} done">
+          <div><div class="d">Day ${x.d}${x.d === dayN ? " · today" : ""}</div><div class="dt">${date(x.d)}</div></div>
+          <span class="tp"><span class="tag t-${x.type}">${x.type}</span></span><div><div class="ttl">${title}</div><div class="nt">${x.note}</div></div></div>`;
+      }).join("") + `</div></div>`;
+    }
+    $("#weeks").innerHTML = html;
+  }
+  $("#plans").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; key = b.dataset.k; draw(); };
+  $("#weeks").onchange = (e) => { const c = e.target.closest("[data-k]"); if (!c) return; Store.set(c.dataset.k, c.checked); c.closest(".drow").classList.toggle("done", c.checked); };
+  draw();
+});
+</script>
+</body>
+</html>
